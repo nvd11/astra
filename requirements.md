@@ -39,11 +39,13 @@
 | P0 | 流式输出 | SSE/WebSocket 打字机效果，支持中断 |
 | P0 | 多轮对话 | 上下文管理，历史消息加载 |
 | P0 | **Logto SSO 登录** | 微信扫码 / OIDC 认证，自动跳转 |
-| P1 | 会话管理 | 新建、重命名、删除、归档、搜索 |
-| P1 | 消息操作 | 复制、重新生成、编辑、删除 |
-| P1 | 主题切换 | 深色/浅色模式，跟随系统 |
+| P0 | **多用户界面隔离** | 用户只能看到自己的会话、消息、记忆 |
+| P1 | 会话管理 | 新建、重命名、删除、归档、搜索（仅限当前用户） |
+| P1 | 消息操作 | 复制、重新生成、编辑、删除（仅限当前用户消息） |
+| P1 | 主题切换 | 深色/浅色模式，跟随系统（用户级偏好存储） |
+| P1 | **用户资料页** | 头像、昵称、Logto 绑定信息、用量统计 |
 | P2 | 代码块增强 | 行号、复制按钮、语言标识 |
-| P2 | 导出功能 | Markdown / PDF / PNG 导出 |
+| P2 | 导出功能 | Markdown / PDF / PNG 导出（仅限当前用户会话） |
 
 ### 2.2 后端功能
 
@@ -53,7 +55,8 @@
 | P0 | Sub-Agent 集群 | 代码、搜索、分析、创作等专业化子代理 |
 | P0 | 记忆能力 | 短期记忆（会话上下文）+ 长期记忆（用户画像/历史） |
 | P0 | **Logto SSO 集成** | OIDC 认证、JWT 签发、用户同步 |
-| P0 | 多用户隔离 | JWT 认证，数据行级隔离，记忆独立 |
+| P0 | **多用户数据隔离** | 用户表、会话表、消息表、记忆表全量 `user_id` 行级隔离 |
+| P0 | **多用户缓存隔离** | Redis Key 前缀 `user:{user_id}:*`，Agent 状态独立 |
 | P0 | LiteLLM 对接 | OpenAI 兼容格式，多模型切换 |
 | P1 | 流式响应 | SSE 推送，支持中断与重连 |
 | P1 | 会话持久化 | MySQL 存储，支持历史回看 |
@@ -70,6 +73,51 @@
 | `analysis_agent` | 数据分析、图表生成、统计计算 | 自动路由 / `@analysis` |
 | `creative_agent` | 文案创作、头脑风暴、内容优化 | 自动路由 / `@creative` |
 | `general_agent` | 兜底通用对话，无法分类时的默认处理 | 自动路由 |
+
+### 2.4 多用户界面隔离设计
+
+**核心原则**：用户登录后，界面仅展示当前用户的数据，无任何跨用户内容泄露。
+
+| 界面模块 | 隔离实现 |
+|----------|----------|
+| **侧边栏会话列表** | 仅查询 `conversations WHERE user_id = current_user_id`，按 `updated_at` 倒序 |
+| **对话窗口** | 加载 `messages WHERE conversation_id = ? AND user_id = current_user_id` |
+| **用户头像/昵称** | 从 Logto 同步，本地 `users` 表存储，仅显示当前用户 |
+| **记忆面板** | 展示 `long_term_memories WHERE user_id = current_user_id`，支持分类筛选 |
+| **设置/偏好** | 读取 `users.preferences` JSON 字段，仅当前用户可修改 |
+| **用量统计** | 展示 `agent_tasks` 聚合数据，仅当前用户可见 |
+| **分享/导出** | 生成链接带 `user_id` 签名，过期时间 24h，仅创建者可撤销 |
+
+**前端路由守卫：**
+```typescript
+// 所有受保护路由必须携带有效 JWT
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <Loading />;
+  if (!user) return <Navigate to="/login" />;
+  return children;
+};
+
+// API 请求自动附加 Authorization Header
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('astra_jwt');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+```
+
+**后端强制过滤：**
+```python
+# 所有数据库查询自动附加 user_id 条件
+@router.get("/conversations")
+async def list_conversations(
+    user: User = Depends(get_current_user),  # JWT 解析
+    db: Session = Depends(get_db)
+):
+    return db.query(Conversation).filter(
+        Conversation.user_id == user.id  # 强制隔离
+    ).order_by(Conversation.updated_at.desc()).all()
+```
 
 ---
 
@@ -337,6 +385,8 @@ Logto 回调 astra.jppwl.asia/callback 携带 code
 - 禁止任何跨用户的聚合查询（除非管理员权限）
 - JWT 过期时间不宜过长（建议 2 小时），支持 Refresh Token 轮换
 - 所有外部请求必须经 Cloudflare HTTPS，禁止裸 IP 访问
+- **前端禁止渲染非当前用户的数据**，即使 API 返回异常也必须过滤
+- **分享链接必须签名 + 过期**，防止未授权访问
 
 ---
 
