@@ -40,10 +40,13 @@
 | P0 | 多轮对话 | 上下文管理，历史消息加载 |
 | P0 | **Logto SSO 登录** | 微信扫码 / OIDC 认证，自动跳转 |
 | P0 | **多用户界面隔离** | 用户只能看到自己的会话、消息、记忆 |
+| P0 | **Session 管理** | 多设备登录管理、会话过期、强制下线 |
 | P1 | 会话管理 | 新建、重命名、删除、归档、搜索（仅限当前用户） |
 | P1 | 消息操作 | 复制、重新生成、编辑、删除（仅限当前用户消息） |
 | P1 | 主题切换 | 深色/浅色模式，跟随系统（用户级偏好存储） |
 | P1 | **用户资料页** | 头像、昵称、Logto 绑定信息、用量统计 |
+| P1 | **Agent 选择器** | 手动指定 Sub-Agent 或自动路由 |
+| P1 | **LLM 模型选择器** | 切换底层模型（DeepSeek / Gemini / Claude 等） |
 | P2 | 代码块增强 | 行号、复制按钮、语言标识 |
 | P2 | 导出功能 | Markdown / PDF / PNG 导出（仅限当前用户会话） |
 
@@ -57,6 +60,7 @@
 | P0 | **Logto SSO 集成** | OIDC 认证、JWT 签发、用户同步 |
 | P0 | **多用户数据隔离** | 用户表、会话表、消息表、记忆表全量 `user_id` 行级隔离 |
 | P0 | **多用户缓存隔离** | Redis Key 前缀 `user:{user_id}:*`，Agent 状态独立 |
+| P0 | **Session 管理** | JWT 黑名单、多设备会话追踪、强制下线 |
 | P0 | LiteLLM 对接 | OpenAI 兼容格式，多模型切换 |
 | P1 | 流式响应 | SSE 推送，支持中断与重连 |
 | P1 | 会话持久化 | MySQL 存储，支持历史回看 |
@@ -74,7 +78,122 @@
 | `creative_agent` | 文案创作、头脑风暴、内容优化 | 自动路由 / `@creative` |
 | `general_agent` | 兜底通用对话，无法分类时的默认处理 | 自动路由 |
 
-### 2.4 多用户界面隔离设计
+### 2.4 Agent 与 LLM 选择器
+
+**Agent 选择器（可选手动指定）：**
+
+用户可在输入框上方选择当前对话使用的 Agent 模式：
+
+| 模式 | 说明 | 适用场景 |
+|------|------|----------|
+| **自动路由**（默认） | Main Agent 自动识别意图并分发 | 通用对话，不确定用哪个 |
+| **代码助手** | 强制路由至 `code_agent` | 编程、调试、代码审查 |
+| **搜索增强** | 强制路由至 `search_agent` | 实时信息、文档检索 |
+| **数据分析** | 强制路由至 `analysis_agent` | 数据处理、图表生成 |
+| **创意写作** | 强制路由至 `creative_agent` | 文案、头脑风暴 |
+| **通用对话** | 强制路由至 `general_agent` | 闲聊、简单问答 |
+
+**LLM 模型选择器（可选切换）：**
+
+用户可为当前会话或全局默认选择底层模型：
+
+| 模型 | 提供方 | 特点 | 适用场景 |
+|------|--------|------|----------|
+| `deepseek-v4-flash` | DeepSeek | 速度快，成本低 | 日常对话、代码生成 |
+| `gemini-3.8-flash` | Google | 多模态强，推理好 | 图文理解、复杂分析 |
+| `claude-sonnet-4-6` | Anthropic | 长文本强，逻辑严谨 | 文档写作、深度分析 |
+| `qwen-max` | 阿里 | 中文优化，知识丰富 | 中文创作、知识问答 |
+
+**选择器 UI 设计：**
+- 位置：输入框上方工具栏，两个下拉选择器并排
+- 默认值：Agent = 自动路由，LLM = 用户上次选择或系统默认
+- 持久化：选择存入 `conversations.model` 和 `conversations.agent_preference`
+- 切换时机：新会话生效，或手动切换后下一条消息生效
+
+**后端处理逻辑：**
+```python
+# 请求体示例
+{
+  "message": "帮我写个 Python 脚本",
+  "conversation_id": "uuid",
+  "agent_override": "code_agent",      # 可选，强制指定 Agent
+  "model_override": "deepseek-v4-flash" # 可选，强制指定模型
+}
+
+# Main Agent 路由逻辑
+if request.agent_override:
+    agent = get_agent(request.agent_override)  # 强制指定
+else:
+    agent = main_agent.route(request.message)  # 自动路由
+
+# LLM 调用
+model = request.model_override or conversation.model or user.default_model
+response = await litellm.acompletion(model=model, messages=messages)
+```
+
+---
+
+### 2.5 Session 管理设计
+
+**Session 生命周期：**
+
+| 阶段 | 说明 | 存储 |
+|------|------|------|
+| **创建** | Logto 认证成功后签发 JWT + Refresh Token | Redis + MySQL |
+| **活跃** | 每次请求刷新 `last_active_at`，滑动过期 | Redis |
+| **过期** | JWT 2 小时过期，Refresh Token 7 天过期 | 自动失效 |
+| **注销** | 用户主动退出，加入 JWT 黑名单 | Redis 黑名单 |
+| **强制下线** | 管理员或用户远程注销其他设备 | Redis 黑名单 |
+
+**多设备会话管理：**
+
+用户可在设置页查看当前所有活跃会话：
+
+| 设备 | 浏览器 | IP | 最后活跃 | 操作 |
+|------|--------|-----|----------|------|
+| MacBook Pro | Chrome 128 | 113.108.x.x | 2 分钟前 | 当前设备 |
+| iPhone 15 | Safari | 113.108.x.x | 3 小时前 | [下线] |
+| Windows PC | Edge 128 | 61.144.x.x | 昨天 | [下线] |
+
+**JWT 黑名单机制（Redis）：**
+```
+# Key: jwt:blacklist:{jti}
+# Value: 1
+# TTL: JWT 剩余有效期
+
+# 检查是否黑名单
+async def is_token_blacklisted(jti: str) -> bool:
+    return await redis.exists(f"jwt:blacklist:{jti}")
+```
+
+**强制下线实现：**
+```python
+@router.post("/sessions/{session_id}/revoke")
+async def revoke_session(
+    session_id: str,
+    user: User = Depends(get_current_user)
+):
+    # 1. 查询该会话的 JWT jti
+    session = await get_session(session_id)
+    if session.user_id != user.id:
+        raise Forbidden()
+    
+    # 2. 加入黑名单
+    await redis.setex(
+        f"jwt:blacklist:{session.jti}",
+        session.jwt_ttl_remaining,
+        1
+    )
+    
+    # 3. 删除会话记录
+    await delete_session(session_id)
+    
+    return {"status": "revoked"}
+```
+
+---
+
+### 2.6 多用户界面隔离设计
 
 **核心原则**：用户登录后，界面仅展示当前用户的数据，无任何跨用户内容泄露。
 
@@ -195,9 +314,26 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE,
     password_hash VARCHAR(255),
     avatar_url TEXT,
-    preferences JSON,           -- 用户偏好设置
+    preferences JSON,           -- 用户偏好设置（默认模型、默认 Agent、主题等）
+    default_model VARCHAR(64) DEFAULT 'deepseek-v4-flash',  -- 用户默认 LLM
+    default_agent VARCHAR(64) DEFAULT 'auto',               -- 用户默认 Agent
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 用户会话表（多设备登录追踪）
+CREATE TABLE user_sessions (
+    id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id CHAR(36) NOT NULL,
+    jti VARCHAR(255) NOT NULL,              -- JWT ID，用于黑名单
+    device_info VARCHAR(255),               -- 设备信息（User-Agent 解析）
+    ip_address VARCHAR(45),                 -- 登录 IP
+    last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,          -- JWT 过期时间
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_active (user_id, last_active_at DESC),
+    INDEX idx_jti (jti)
 );
 
 -- 会话表
@@ -205,7 +341,8 @@ CREATE TABLE conversations (
     id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
     user_id CHAR(36) NOT NULL,
     title VARCHAR(255) DEFAULT '新对话',
-    model VARCHAR(64),          -- 使用的模型
+    model VARCHAR(64),          -- 当前会话选择的 LLM 模型
+    agent_preference VARCHAR(64), -- 当前会话选择的 Agent（auto/code/search/analysis/creative/general）
     system_prompt TEXT,         -- 自定义系统提示词
     is_archived BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
