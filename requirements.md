@@ -557,23 +557,97 @@ astra/
 └── README.md
 ```
 
-### 7.2 ArgoCD Application
+### 7.2 节点部署规划
+
+| 组件 | 部署节点 | 节点位置 | 架构 | 说明 |
+|------|----------|----------|------|------|
+| **Frontend** | `free-arm-vm` | OCI 新加坡 | ARM64 | 静态文件托管，Cloudflare CDN 回源 |
+| **Backend** | `nuc` | 本地家宽 | AMD64 | FastAPI 服务，低延迟访问 MySQL |
+| **Redis** | `oppo-termux` | 本地家宽 | ARM64 | OPPO 手机 Termux，边缘缓存节点 |
+| **MySQL** | `rin-heatwave` | OCI 新加坡 | x86_64 | OCI HeatWave 托管，无需部署 |
+
+**节点选择理由：**
+
+- **Frontend → OCI free ARM VM**：静态资源托管，OCI 新加坡国际出口优质，Cloudflare CDN 回源延迟低；ARM64 架构与 OCI free tier 匹配，零成本。
+- **Backend → NUC**：本地家宽 NUC 性能强劲（AMD64），直连 OCI MySQL 新加坡延迟稳定（~50ms），且便于本地调试。
+- **Redis → OPPO Termux**：OPPO 手机 ARM64 架构，Termux 环境轻量运行 Redis，作为边缘缓存节点；家宽内网直连 Backend（NUC），延迟 <1ms；利用闲置设备，零额外成本。
+
+**网络拓扑：**
+
+```
+用户浏览器
+    ↓ HTTPS
+Cloudflare Edge CDN (astra.jppwl.asia)
+    ↓ 回源
+OCI free-arm-vm (Frontend 静态文件)
+    ↓ API 调用
+api.astra.jppwl.asia → Cloudflare → NUC (Backend FastAPI)
+    ↓ 缓存读写
+NUC → OPPO Termux Redis (家宽内网, <1ms)
+    ↓ 持久化
+NUC → OCI MySQL HeatWave (新加坡, ~50ms)
+```
+
+**K8s Node Selector 配置：**
+
+```yaml
+# Frontend Deployment
+nodeSelector:
+  kubernetes.io/hostname: free-arm-vm
+  kubernetes.io/arch: arm64
+
+# Backend Deployment
+nodeSelector:
+  kubernetes.io/hostname: nuc
+  kubernetes.io/arch: amd64
+
+# Redis 不走 K8s，独立部署在 OPPO Termux
+# 通过 Tailscale 或家宽内网直连
+```
+
+**OPPO Termux Redis 配置要点：**
+
+```bash
+# OPPO 手机 Termux 安装 Redis
+pkg install redis
+
+# 启动 Redis（绑定 Tailscale IP 或家宽内网 IP）
+redis-server --bind 100.x.x.x --port 6379 --requirepass hsbc1234
+
+# 或配置持久化
+redis-server --appendonly yes --appendfsync everysec
+```
+
+**Backend 连接 Redis 配置：**
+
+```python
+# 优先连接 OPPO Termux Redis（家宽内网）
+REDIS_URL = "redis://:hsbc1234@100.x.x.x:6379/0"  # Tailscale IP
+
+# 降级策略：OPPO Redis 不可用 → 直连 MySQL（容忍穿透）
+```
+
+---
+
+### 7.3 ArgoCD Application
+
+**Frontend Application（部署到 OCI free ARM VM）：**
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: chat-app
+  name: astra-frontend
   namespace: argocd
 spec:
   project: default
   source:
-    repoURL: https://github.com/nvd11/chat-app.git
+    repoURL: https://github.com/nvd11/astra
     targetRevision: main
-    path: k8s
+    path: k8s/frontend
   destination:
     server: https://kubernetes.default.svc
-    namespace: chat-app
+    namespace: astra
   syncPolicy:
     automated:
       prune: true
@@ -582,7 +656,51 @@ spec:
       - CreateNamespace=true
 ```
 
-### 7.3 环境变量
+**Backend Application（部署到 NUC）：**
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: astra-backend
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/nvd11/astra
+    targetRevision: main
+    path: k8s/backend
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: astra
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+**K8s Manifest 目录结构：**
+
+```
+k8s/
+├── frontend/
+│   ├── deployment.yaml      # nodeSelector: free-arm-vm, arm64
+│   ├── service.yaml         # ClusterIP
+│   └── httproute.yaml       # Kong: astra.jppwl.asia → frontend:80
+├── backend/
+│   ├── deployment.yaml      # nodeSelector: nuc, amd64
+│   ├── service.yaml         # ClusterIP
+│   ├── httproute.yaml       # Kong: api.astra.jppwl.asia → backend:8000
+│   ├── secret.yaml          # DATABASE_URL, REDIS_URL, JWT_SECRET, LOGTO_*
+│   └── configmap.yaml       # LITELLM_BASE_URL, ENVIRONMENT, LOGTO_ENDPOINT
+└── argocd/
+    ├── frontend-app.yaml    # ArgoCD Application for frontend
+    └── backend-app.yaml     # ArgoCD Application for backend
+```
+
+### 7.4 环境变量
 
 | 变量 | 说明 | 存储 |
 |------|------|------|
@@ -597,7 +715,7 @@ spec:
 | `LOGTO_REDIRECT_URI` | 回调地址（`https://astra.jppwl.asia/callback`） | K8s ConfigMap |
 | `ENVIRONMENT` | 环境标识（dev/staging/prod） | K8s ConfigMap |
 
-### 7.4 Cloudflare DNS 配置
+### 7.5 Cloudflare DNS 配置
 
 需在 Cloudflare 控制台（或 API）为 `jppwl.asia` 添加以下记录：
 
