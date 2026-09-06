@@ -708,7 +708,7 @@ k8s/
 | `REDIS_URL` | Redis 连接串 | K8s Secret |
 | `LITELLM_API_KEY` | LiteLLM 网关密钥 | K8s Secret |
 | `LITELLM_BASE_URL` | LiteLLM 网关地址 | K8s ConfigMap |
-| `JWT_SECRET` | JWT 签名密钥 | K8s Secret |
+| `JWT_SECRET` | （可选开发回退）：标准 OIDC/Cloudflare 模式直接基于 JWKS 公钥验签，无需此密钥 | K8s Secret（仅自签模式） |
 | `LOGTO_ENDPOINT` | Logto SSO 端点（`https://auth.jppwl.asia`） | K8s ConfigMap |
 | `LOGTO_APP_ID` | Logto 应用 ID | K8s Secret |
 | `LOGTO_APP_SECRET` | Logto 应用密钥 | K8s Secret |
