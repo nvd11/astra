@@ -1,0 +1,225 @@
+[project]
+name = "astra-backend"
+version = "1.0.0"
+description = "Modern LLM Chat Backend with FastAPI, uv, LangGraph, and MySQL HeatWave"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Jason Pan", email = "jason1.pan@hsbc.com.hk"}
+]
+keywords = ["fastapi", "llm", "langgraph", "litellm", "heatwave", "uv"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+]
+
+# 生产依赖
+dependencies = [
+    # Web 框架与服务器
+    "fastapi>=0.110.0,<1.0.0",
+    "uvicorn[standard]>=0.29.0,<1.0.0",
+
+    # 数据校验与配置
+    "pydantic>=2.7.0,<3.0.0",
+    "pydantic-settings>=2.2.0,<3.0.0",
+
+    # 结构化日志
+    "loguru>=0.7.2,<1.0.0",
+
+    # 环境变量与配置加载
+    "python-dotenv>=1.0.1,<2.0.0",
+    "PyYAML>=6.0.1,<7.0.0",
+
+    # 数据库 (SQLAlchemy 2.0 异步引擎 + MySQL asyncmy 驱动)
+    "sqlalchemy[asyncio]>=2.0.30,<3.0.0",
+    "asyncmy>=0.2.9,<1.0.0",
+
+    # 缓存与高速消息
+    "redis>=5.0.4,<6.0.0",
+
+    # HTTP 异步客户端
+    "httpx>=0.27.0,<1.0.0",
+
+    # JWT 认证与加密
+    "python-jose[cryptography]>=3.3.0,<4.0.0",
+    "passlib[bcrypt]>=1.7.4,<2.0.0",
+    "python-multipart>=0.0.9,<1.0.0",
+
+    # AI / Agent 多智能体与私有网关
+    "langchain>=0.2.0,<1.0.0",
+    "langchain-core>=0.2.0,<1.0.0",
+    "langgraph>=0.0.60,<1.0.0",
+    "litellm>=1.35.0",
+]
+
+# 开发与质量检查依赖
+[project.optional-dependencies]
+dev = [
+    # 单元测试与异步支持
+    "pytest>=8.1.0,<9.0.0",
+    "pytest-asyncio>=0.23.0,<1.0.0",
+    "pytest-cov>=5.0.0,<6.0.0",
+
+    # 代码质量与格式化
+    "black>=24.3.0,<25.0.0",
+    "isort>=5.13.0,<6.0.0",
+    "flake8>=6.1.0,<7.0.0",
+    "mypy>=1.9.0,<2.0.0",
+    "ruff>=0.3.4,<1.0.0",
+
+    # 类型注解 stubs
+    "types-PyYAML>=6.0.0,<7.0.0",
+    "types-python-jose>=3.3.0,<4.0.0",
+    "types-passlib>=1.7.0,<2.0.0",
+]
+
+# 构建系统配置
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/test",
+    "/pyproject.toml",
+    "/README.md",
+]
+
+# ========== 工具链配置 (完全对齐 python-template-v2) ==========
+
+# Black 代码格式化
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  \.eggs
+  | \.git
+  | \.mypy_cache
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+# isort 导入排序
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+src_paths = ["src", "test"]
+
+# MyPy 类型检查
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+allow_untyped_globals = false
+allow_redefinition = false
+implicit_reexport = false
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "loguru.*",
+    "litellm.*",
+    "jose.*",
+    "redis.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "src.engine.redis_client"
+warn_return_any = false
+disallow_untyped_calls = false
+
+# Pytest 测试配置 (标准内嵌做法)
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--strict-markers",
+    "--tb=short",
+]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+
+# Coverage 覆盖率配置
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/test/*",
+    "*/__init__.py",
+]
+branch = true
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+
+# Ruff 极速静态检查
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501", # line too long (handled by black)
+    "B008", # do not perform function calls in argument defaults
+    "UP046", # Generic class BaseResponse uses Generic[T] subclass (Pydantic v2 standard)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"test/**/*.py" = ["B011"]
+"src/server.py" = ["E402"]

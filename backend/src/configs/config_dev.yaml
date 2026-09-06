@@ -1,0 +1,10 @@
+# Astra Backend 联调开发环境配置
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  root_path: "/api"
+
+logging:
+  level: "DEBUG"
