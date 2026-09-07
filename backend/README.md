@@ -55,3 +55,8 @@ uv run ruff check src test
 # 代码格式化
 uv run isort src test && uv run black src test
 ```
+
+## GitOps & CI/CD 自动化流水线
+
+- **Backend CI (`.github/workflows/ci.yaml`)**：自动运行 Black、isort、Ruff、MyPy Strict 静态代码分析与 226 个单元测试门禁；
+- **Backend CD (`.github/workflows/build-and-push-image.yaml`)**：自动编译 `linux/amd64` + `linux/arm64` 双架构容器镜像并推送至 GHCR，计算唯一不可变 SHA256 Digest 并自动向 `my-argocd-manifests` 发起 GitOps 事件派发，触发 ArgoCD 生产部署。
