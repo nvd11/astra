@@ -15,6 +15,45 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from src.engine.redis_client import get_redis_client
 
 
+def extract_client_ip(request: Request) -> str:
+    """提取客户端真实 IP 地址 (支持 Cloudflare、Kong/Nginx 及直连).
+
+    优先级：
+    1. CF-Connecting-IP (Cloudflare 边缘注入的真实访客 IP)
+    2. X-Forwarded-For (反向代理链，取最左侧原始客户端 IP)
+    3. X-Real-IP (反向代理直接指定的目标真实 IP)
+    4. request.client.host (直连客户端 Socket IP)
+
+    Args:
+        request: FastAPI 请求对象
+
+    Returns:
+        str: 识别出的真实客户端 IP
+    """
+    # 1. Cloudflare 真实 IP
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip and cf_ip.strip():
+        return cf_ip.strip()
+
+    # 2. X-Forwarded-For 代理链第一位为原始客户端 IP
+    xff = request.headers.get("X-Forwarded-For")
+    if xff and xff.strip():
+        client_ip = xff.split(",")[0].strip()
+        if client_ip:
+            return client_ip
+
+    # 3. X-Real-IP
+    x_real_ip = request.headers.get("X-Real-IP")
+    if x_real_ip and x_real_ip.strip():
+        return x_real_ip.strip()
+
+    # 4. 直连客户端 host
+    if request.client and request.client.host:
+        return request.client.host
+
+    return "unknown"
+
+
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Redis 计数器访问限流中间件."""
 
@@ -50,10 +89,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(prefix) for prefix in self.whitelist_prefixes):
             return await call_next(request)
 
-        # 获取限流主体 (客户端 IP 或 JWT 携带的 sub)
-        identifier = "unknown"
-        if request.client:
-            identifier = request.client.host
+        # 获取限流主体 (真实客户端 IP)
+        identifier = extract_client_ip(request)
 
         current_window = int(time.time() // self.window_seconds)
         redis_key = f"rate_limit:{identifier}:{current_window}"

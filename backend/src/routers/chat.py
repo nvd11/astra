@@ -73,11 +73,10 @@ async def chat_stream(
         llm_context = cached_context[-20:]
         await memory.set_context(conv.id, llm_context)
     else:
-        history_messages, _ = await msg_repo.list_by_conversation(
+        history_messages = await msg_repo.get_recent_messages(
             conversation_id=conv.id,
             user_id=current_user.id,
-            page=1,
-            page_size=20,
+            limit=20,
         )
         llm_context = [{"role": m.role, "content": m.content} for m in history_messages]
         await memory.set_context(conv.id, llm_context)

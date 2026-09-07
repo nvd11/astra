@@ -380,6 +380,38 @@ class MessageRepository:
 
         return items, total
 
+    async def get_recent_messages(
+        self,
+        conversation_id: str,
+        user_id: str,
+        limit: int = 20,
+    ) -> list[Message]:
+        """获取会话最近的 N 条消息 (按时间升序返回).
+
+        倒序查询最新的 limit 条记录，然后按时间正序排列返回，供 LLM 多轮上下文构建使用.
+
+        Args:
+            conversation_id: 会话 ID
+            user_id: 用户 ID
+            limit: 最大拉取消息数量
+
+        Returns:
+            list[Message]: 最近 N 条按时间升序排列的消息列表
+        """
+        stmt = (
+            select(Message)
+            .where(
+                Message.conversation_id == conversation_id,
+                Message.user_id == user_id,
+                Message.is_deleted == False,  # noqa: E712
+            )
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        items = list(result.scalars().all())
+        return list(reversed(items))
+
     async def get_message_count(self, conversation_id: str, user_id: str) -> int:
         """获取会话内未删除消息总数.
 
