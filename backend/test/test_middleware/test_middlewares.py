@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.middleware.rate_limit import RateLimitMiddleware
+from src.middleware.rate_limit import RateLimitMiddleware, extract_client_ip
 from src.middleware.request_id import RequestIDMiddleware
 from src.middleware.timing import TimingMiddleware
 
@@ -101,3 +101,64 @@ class TestMiddlewares:
         ):
             res = client.get("/ping")
             assert res.status_code == 200
+
+    def test_extract_client_ip_priorities(self):
+        """测试提取真实客户端 IP 的各级优先级."""
+        from unittest.mock import MagicMock
+
+        # 1. CF-Connecting-IP 优先
+        req1 = MagicMock()
+        req1.headers = {
+            "CF-Connecting-IP": "104.16.1.1",
+            "X-Forwarded-For": "10.0.0.1, 10.42.0.1",
+            "X-Real-IP": "10.0.0.2",
+        }
+        assert extract_client_ip(req1) == "104.16.1.1"
+
+        # 2. X-Forwarded-For 代理链第一项
+        req2 = MagicMock()
+        req2.headers = {
+            "X-Forwarded-For": "203.0.113.195, 10.42.0.10",
+            "X-Real-IP": "10.42.0.10",
+        }
+        assert extract_client_ip(req2) == "203.0.113.195"
+
+        # 3. X-Real-IP
+        req3 = MagicMock()
+        req3.headers = {"X-Real-IP": "198.51.100.42"}
+        assert extract_client_ip(req3) == "198.51.100.42"
+
+        # 4. request.client.host 直连回退
+        req4 = MagicMock()
+        req4.headers = {}
+        req4.client.host = "192.168.1.50"
+        assert extract_client_ip(req4) == "192.168.1.50"
+
+        # 5. 完全无法获取时回退 unknown
+        req5 = MagicMock()
+        req5.headers = {}
+        req5.client = None
+        assert extract_client_ip(req5) == "unknown"
+
+    def test_rate_limit_per_client_ip_isolation(self, test_app):
+        """测试不同客户端真实 IP 的限流键隔离."""
+        client = TestClient(test_app)
+
+        mock_redis = AsyncMock()
+        mock_redis.incr = AsyncMock(return_value=1)
+        mock_redis.expire = AsyncMock()
+
+        with patch(
+            "src.middleware.rate_limit.get_redis_client", return_value=mock_redis
+        ):
+            # 客户端 A
+            client.get("/ping", headers={"CF-Connecting-IP": "1.1.1.1"})
+            key_a = mock_redis.incr.call_args[0][0]
+            assert "1.1.1.1" in key_a
+
+            # 客户端 B
+            client.get("/ping", headers={"CF-Connecting-IP": "2.2.2.2"})
+            key_b = mock_redis.incr.call_args[0][0]
+            assert "2.2.2.2" in key_b
+
+            assert key_a != key_b

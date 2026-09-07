@@ -86,6 +86,7 @@ class TestChatRouter:
 
             mock_msg_repo = AsyncMock()
             mock_msg_repo.create.return_value = mock_user_msg
+            mock_msg_repo.get_recent_messages.return_value = [mock_user_msg]
             mock_msg_repo.list_by_conversation.return_value = ([mock_user_msg], 1)
             mock_msg_cls.return_value = mock_msg_repo
 

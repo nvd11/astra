@@ -208,6 +208,23 @@ class TestMessageRepository:
         assert len(items) == 1
 
     @pytest.mark.asyncio
+    async def test_get_recent_messages(self, repo, mock_session):
+        """测试倒序拉取最新 N 条消息并反转为时间升序."""
+        msg_earlier = MagicMock(spec=Message, id="msg-1", content="First")
+        msg_later = MagicMock(spec=Message, id="msg-2", content="Second")
+
+        mock_items = MagicMock()
+        # 数据库 ORDER BY created_at DESC 先查出最新的 msg_later，再查出 msg_earlier
+        mock_items.scalars.return_value.all.return_value = [msg_later, msg_earlier]
+        mock_session.execute.return_value = mock_items
+
+        items = await repo.get_recent_messages("conv-1", "user-123", limit=20)
+        # 返回列表应被 reversed 为时间升序 [msg_earlier, msg_later]
+        assert len(items) == 2
+        assert items[0] is msg_earlier
+        assert items[1] is msg_later
+
+    @pytest.mark.asyncio
     async def test_get_message_count(self, repo, mock_session):
         """测试获取消息数量."""
         mock_res = MagicMock()
