@@ -95,9 +95,9 @@ class TestConfig:
         assert settings.log_level == "INFO"
         assert (
             settings.database_url
-            == "mysql+asyncmy://astra_user:astra_pass@127.0.0.1:3306/astra"
+            == "mysql+asyncmy://astra_user:placeholder_pass@127.0.0.1:3306/astra"
         )
-        assert settings.redis_url == "redis://:hsbc1234@127.0.0.1:6379/0"
+        assert settings.redis_url == "redis://127.0.0.1:6379/0"
         assert settings.litellm_base_url == "https://litellm.jppwl.asia"
         assert settings.default_model == "deepseek-v4-flash"
         assert settings.jwt_algorithm == "HS256"

@@ -114,13 +114,13 @@ class Settings(BaseSettings):
 
     # ========== 数据库配置 (OCI MySQL HeatWave) ==========
     database_url: str = Field(
-        default="mysql+asyncmy://astra_user:astra_pass@127.0.0.1:3306/astra",
+        default="mysql+asyncmy://astra_user:placeholder_pass@127.0.0.1:3306/astra",
         description="MySQL HeatWave 异步连接串",
     )
 
     # ========== 缓存配置 (Redis) ==========
     redis_url: str = Field(
-        default="redis://:hsbc1234@127.0.0.1:6379/0", description="Redis 连接串"
+        default="redis://127.0.0.1:6379/0", description="Redis 连接串"
     )
 
     # ========== 私有 LiteLLM 网关 ==========
@@ -128,7 +128,7 @@ class Settings(BaseSettings):
         default="https://litellm.jppwl.asia", description="LiteLLM 网关地址"
     )
     litellm_api_key: str = Field(
-        default="sk-hsbc-litellm-secret-key", description="LiteLLM 网关密钥"
+        default="sk-placeholder-litellm-key", description="LiteLLM 网关密钥"
     )
     default_model: str = Field(default="deepseek-v4-flash", description="默认 LLM 模型")
 

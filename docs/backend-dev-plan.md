@@ -273,11 +273,11 @@ backend/
 
   # ========== 数据库连接 (OCI MySQL HeatWave) ==========
   # 本地开发可直连测试库或跳板机代理
-  APP_DATABASE_URL=mysql+asyncmy://astra_user:astra_pass@127.0.0.1:3306/astra
+  APP_DATABASE_URL=mysql+asyncmy://astra_user:<YOUR_DB_PASSWORD>@127.0.0.1:3306/astra
 
   # ========== 缓存服务 (Redis / OPPO 边缘节点) ==========
   # 本地开发可指向 localhost:6379 或通过内网 Tailscale 访问
-  APP_REDIS_URL=redis://:hsbc1234@127.0.0.1:6379/0
+  APP_REDIS_URL=redis://:<YOUR_REDIS_PASSWORD>@127.0.0.1:6379/0
 
   # ========== 私有 LiteLLM 网关 ==========
   APP_LITELLM_BASE_URL=https://litellm.jppwl.asia
@@ -333,7 +333,7 @@ backend/
   - **基础信息**：`app_name: str = "Astra"`, `app_version: str = "1.0.0"`, `app_environment: str = "dev"`, `debug: bool = False`
   - **网络监听**：`host: str = "0.0.0.0"`, `port: int = 8000`, `workers: int = 1`, `root_path: str = ""`
   - **数据库连接**：`database_url: str`（OCI MySQL HeatWave 异步连接串，形如 `mysql+asyncmy://user:pass@host:3306/astra`）
-  - **缓存连接**：`redis_url: str`（OPPO 边缘节点 Redis，形如 `redis://:hsbc1234@10.0.1.17:6379/0`）
+  - **缓存连接**：`redis_url: str`（OPPO 边缘节点 Redis，形如 `redis://:<YOUR_REDIS_PASSWORD>@10.0.1.17:6379/0`）
   - **LLM 私有网关**：`litellm_base_url: str`, `litellm_api_key: str`, `default_model: str = "deepseek-v4-flash"`
   - **认证系统（可插拔多模式 / JWT / Logto / Cloudflare Access）**：
     - `auth_enabled: bool = True`（全局认证开关：若为 `False` 则完全跳过 JWT/Logto 校验并自动注入只读 Mock 匿名用户，专用于本地单元测试、离线开发或单租户内网部署）

@@ -612,7 +612,7 @@ nodeSelector:
 pkg install redis
 
 # 启动 Redis（绑定 Tailscale IP 或家宽内网 IP）
-redis-server --bind 100.x.x.x --port 6379 --requirepass hsbc1234
+redis-server --bind 100.x.x.x --port 6379 --requirepass <YOUR_REDIS_PASSWORD>
 
 # 或配置持久化
 redis-server --appendonly yes --appendfsync everysec
@@ -622,7 +622,7 @@ redis-server --appendonly yes --appendfsync everysec
 
 ```python
 # 优先连接 OPPO Termux Redis（家宽内网）
-REDIS_URL = "redis://:hsbc1234@100.x.x.x:6379/0"  # Tailscale IP
+REDIS_URL = "redis://:<YOUR_REDIS_PASSWORD>@100.x.x.x:6379/0"  # Tailscale IP
 
 # 降级策略：OPPO Redis 不可用 → 直连 MySQL（容忍穿透）
 ```
