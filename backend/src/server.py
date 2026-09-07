@@ -18,6 +18,9 @@ sys.path.insert(0, str(project_root))
 from loguru import logger
 
 from src.configs.config import APP_ENV, get_settings
+from src.main import app
+
+__all__ = ["app", "main"]
 
 
 def main() -> None:
