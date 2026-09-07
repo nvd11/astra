@@ -22,8 +22,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 优先拷贝依赖定义文件以最大化利用 Docker 构建层缓存
-COPY pyproject.toml uv.lock* ./
+# 优先拷贝依赖定义文件与说明文档以最大化利用 Docker 构建层缓存
+COPY pyproject.toml uv.lock* README.md ./
 
 # 极速预安装生产依赖 (无开发依赖，无裸项目构建)
 RUN uv sync --frozen --no-dev --no-install-project
