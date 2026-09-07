@@ -54,7 +54,7 @@ jobs:
 
       - name: Run Pytest Suite with Coverage
         run: |
-          uv run pytest --cov=src --cov-report=term-missing --cov-report=xml
+          uv run pytest --ignore=test/test_e2e_live_api.py --cov=src --cov-report=term-missing --cov-report=xml
 
       - name: Upload Test Coverage
         uses: actions/upload-artifact@v4
