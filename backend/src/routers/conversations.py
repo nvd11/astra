@@ -123,24 +123,27 @@ async def list_conversations(
         is_archived=is_archived,
     )
 
-    # 组装返回数据，附带每条会话的消息数量
-    conversation_items: list[ConversationData] = []
-    for conv in items:
-        msg_count = await msg_repo.get_message_count(conv.id, current_user.id)
-        conversation_items.append(
-            ConversationData(
-                id=conv.id,
-                session_id=conv.session_id,
-                title=conv.title,
-                model=conv.model,
-                agent_preference=conv.agent_preference,
-                system_prompt=conv.system_prompt,
-                is_archived=conv.is_archived,
-                created_at=conv.created_at,
-                updated_at=conv.updated_at,
-                message_count=msg_count,
-            )
+    # 批量预加载消息计数 (消除 N+1 查询)
+    conv_ids = [conv.id for conv in items]
+    msg_counts = await msg_repo.get_message_counts_by_conversations(
+        conv_ids, current_user.id
+    )
+
+    conversation_items: list[ConversationData] = [
+        ConversationData(
+            id=conv.id,
+            session_id=conv.session_id,
+            title=conv.title,
+            model=conv.model,
+            agent_preference=conv.agent_preference,
+            system_prompt=conv.system_prompt,
+            is_archived=conv.is_archived,
+            created_at=conv.created_at,
+            updated_at=conv.updated_at,
+            message_count=msg_counts.get(conv.id, 0),
         )
+        for conv in items
+    ]
 
     has_more = (page * page_size) < total
 

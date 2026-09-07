@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, String, Text, select
+from sqlalchemy import JSON, DateTime, String, Text, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -318,10 +318,28 @@ class SessionRepository:
         await self.session.flush()
         return True
 
+    async def delete_by_id(self, session_id: str, user_id: str) -> bool:
+        """根据会话 ID 和用户 ID 删除会话 (行级隔离单句原子删除).
+
+        Args:
+            session_id: 会话记录 ID
+            user_id: 所属用户 ID
+
+        Returns:
+            bool: 是否删除成功
+        """
+        stmt = delete(UserSession).where(
+            UserSession.id == session_id,
+            UserSession.user_id == user_id,
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        return (getattr(result, "rowcount", 0) or 0) > 0
+
     async def delete_by_user_id(
         self, user_id: str, exclude_current: str | None = None
     ) -> int:
-        """删除用户的所有会话 (可选排除当前会话).
+        """删除用户的所有会话 (可选排除当前会话，单句原子批量删除).
 
         Args:
             user_id: 用户 ID
@@ -330,12 +348,10 @@ class SessionRepository:
         Returns:
             int: 删除的会话数量
         """
-        sessions = await self.get_by_user_id(user_id)
-        count = 0
-        for session in sessions:
-            if exclude_current and session.refresh_token == exclude_current:
-                continue
-            await self.session.delete(session)
-            count += 1
+        stmt = delete(UserSession).where(UserSession.user_id == user_id)
+        if exclude_current:
+            stmt = stmt.where(UserSession.refresh_token != exclude_current)
+
+        result = await self.session.execute(stmt)
         await self.session.flush()
-        return count
+        return int(getattr(result, "rowcount", 0) or 0)

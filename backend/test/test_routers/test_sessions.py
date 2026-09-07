@@ -45,13 +45,14 @@ class TestSessionsRouter:
         with patch(
             "src.routers.sessions.SessionRepository", return_value=mock_session_repo
         ):
-            response = client.get("/sessions")
+            response = client.get("/sessions", headers={"X-Session-ID": "session-123"})
 
             assert response.status_code == 200
             data = response.json()
             assert data["code"] == 0
             assert len(data["data"]) == 1
             assert data["data"][0]["device_info"] == "Test Device"
+            assert data["data"][0]["is_current"] is True
 
     def test_list_sessions_auth_disabled(self, client: TestClient, app):
         """测试获取会话列表 - 认证关闭."""
@@ -96,11 +97,7 @@ class TestSessionsRouter:
         app.dependency_overrides[get_current_user] = lambda: mock_user
 
         mock_session_repo = AsyncMock()
-        mock_session = MagicMock(spec=UserSession)
-        mock_session.id = "session-123"
-        mock_session.refresh_token = "test-refresh-token"
-        mock_session_repo.get_by_user_id.return_value = [mock_session]
-        mock_session_repo.delete_by_refresh_token.return_value = True
+        mock_session_repo.delete_by_id.return_value = True
 
         from unittest.mock import patch
 
@@ -112,6 +109,9 @@ class TestSessionsRouter:
             assert response.status_code == 200
             data = response.json()
             assert data["code"] == 0
+            mock_session_repo.delete_by_id.assert_called_once_with(
+                "session-123", "user-123"
+            )
 
     def test_delete_session_not_found(self, client: TestClient, app):
         """测试删除会话 - 不存在."""
@@ -132,7 +132,7 @@ class TestSessionsRouter:
         app.dependency_overrides[get_current_user] = lambda: mock_user
 
         mock_session_repo = AsyncMock()
-        mock_session_repo.get_by_user_id.return_value = []
+        mock_session_repo.delete_by_id.return_value = False
 
         from unittest.mock import patch
 
@@ -142,6 +142,9 @@ class TestSessionsRouter:
             response = client.delete("/sessions/nonexistent")
 
             assert response.status_code == 404
+            mock_session_repo.delete_by_id.assert_called_once_with(
+                "nonexistent", "user-123"
+            )
 
     def test_delete_session_auth_disabled(self, client: TestClient, app):
         """测试删除会话 - 认证关闭."""

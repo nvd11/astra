@@ -218,22 +218,32 @@ class TestSessionRepository:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_delete_by_user_id(self, session_repo, mock_session):
-        """测试删除用户所有会话."""
-        mock_session1 = MagicMock(spec=UserSession)
-        mock_session1.refresh_token = "token-1"
-        mock_session2 = MagicMock(spec=UserSession)
-        mock_session2.refresh_token = "token-2"
-        mock_sessions = [mock_session1, mock_session2]
-
+    async def test_delete_by_id(self, session_repo, mock_session):
+        """测试根据 ID 删除会话."""
         mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = mock_sessions
+        mock_result.rowcount = 1
         mock_session.execute.return_value = mock_result
-        mock_session.delete = AsyncMock()
+        mock_session.flush = AsyncMock()
+
+        ok = await session_repo.delete_by_id("sess-1", "user-123")
+        assert ok is True
+
+        # 删除不存在记录
+        mock_result.rowcount = 0
+        ok2 = await session_repo.delete_by_id("sess-none", "user-123")
+        assert ok2 is False
+
+    @pytest.mark.asyncio
+    async def test_delete_by_user_id(self, session_repo, mock_session):
+        """测试原子批量删除用户所有会话."""
+        mock_result = MagicMock()
+        mock_result.rowcount = 3
+        mock_session.execute.return_value = mock_result
         mock_session.flush = AsyncMock()
 
         count = await session_repo.delete_by_user_id(
             "user-123", exclude_current="token-1"
         )
-        assert count == 1
-        mock_session.delete.assert_called_once_with(mock_session2)
+        assert count == 3
+        mock_session.execute.assert_called_once()
+        mock_session.flush.assert_called_once()

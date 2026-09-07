@@ -235,6 +235,25 @@ class TestMessageRepository:
         assert count == 42
 
     @pytest.mark.asyncio
+    async def test_get_message_counts_by_conversations(self, repo, mock_session):
+        """测试批量获取会话消息数量 (防 N+1)."""
+        # 空列表直接返回空字典
+        empty_res = await repo.get_message_counts_by_conversations([], "user-123")
+        assert empty_res == {}
+
+        mock_res = MagicMock()
+        mock_res.tuples.return_value.all.return_value = [
+            ("conv-1", 10),
+            ("conv-2", 20),
+        ]
+        mock_session.execute.return_value = mock_res
+
+        res = await repo.get_message_counts_by_conversations(
+            ["conv-1", "conv-2"], "user-123"
+        )
+        assert res == {"conv-1": 10, "conv-2": 20}
+
+    @pytest.mark.asyncio
     async def test_update_content_success(self, repo, mock_session):
         """测试更新消息内容 - 成功."""
         mock_msg = MagicMock(spec=Message)

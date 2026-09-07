@@ -100,6 +100,9 @@ class TestConversationsRouter:
             mock_conv_cls.return_value = mock_conv_repo
 
             mock_msg_repo = AsyncMock()
+            mock_msg_repo.get_message_counts_by_conversations.return_value = {
+                "conv-1": 5
+            }
             mock_msg_repo.get_message_count.return_value = 5
             mock_msg_cls.return_value = mock_msg_repo
 
