@@ -20,7 +20,6 @@ import pytest_asyncio
 import redis.asyncio as aioredis
 
 # 导入应用定义以满足覆盖率探针检测
-from src.configs.config import get_settings
 
 # 线上 API 入口与基础设施连接参数
 API_BASE_URL = "https://gw.jppwl.asia/api"

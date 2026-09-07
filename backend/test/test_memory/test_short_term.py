@@ -1,7 +1,7 @@
 """Redis L1 短期记忆上下文缓存单元测试."""
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
