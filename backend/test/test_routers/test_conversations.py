@@ -52,6 +52,7 @@ class TestConversationsRouter:
 
             response = client.post(
                 "/conversations",
+                headers={"X-Session-ID": "session-dev-1"},
                 json={
                     "title": "测试新对话",
                     "model": "deepseek-v4-flash",
@@ -65,6 +66,14 @@ class TestConversationsRouter:
             assert data["code"] == 0
             assert data["data"]["id"] == "conv-1"
             assert data["data"]["title"] == "测试新对话"
+            mock_repo.create.assert_called_once_with(
+                user_id="user-123",
+                session_id="session-dev-1",
+                title="测试新对话",
+                model="deepseek-v4-flash",
+                agent_preference="auto",
+                system_prompt="system",
+            )
 
     def test_list_conversations_success(self, client: TestClient, app, auth_user):
         """测试获取会话列表 - 成功."""

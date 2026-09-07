@@ -100,6 +100,7 @@ class TestChatRouter:
 
             response = client.post(
                 "/chat/stream",
+                headers={"X-Session-ID": "session-dev-1"},
                 json={
                     "conversation_id": "conv-1",
                     "content": "你好 Astra",
@@ -109,6 +110,22 @@ class TestChatRouter:
 
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["content-type"]
+            assert mock_msg_repo.create.call_count == 2
+            mock_msg_repo.create.assert_any_call(
+                conversation_id="conv-1",
+                user_id="user-123",
+                session_id="session-dev-1",
+                role="user",
+                content="你好 Astra",
+            )
+            mock_msg_repo.create.assert_any_call(
+                conversation_id="conv-1",
+                user_id="user-123",
+                session_id="session-dev-1",
+                role="assistant",
+                content="你好！很高兴为你服务",
+                metadata={"agent": "direct_chat", "finish_reason": "stop"},
+            )
 
             lines = response.text.split("\n\n")
             # 过滤空行

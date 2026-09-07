@@ -67,6 +67,7 @@ class ConversationData(BaseModel):
     """单个会话元数据."""
 
     id: str = Field(description="会话 ID")
+    session_id: str | None = Field(default=None, description="发起创建的设备会话 ID")
     title: str = Field(description="会话标题")
     model: str = Field(description="绑定模型")
     agent_preference: str = Field(description="绑定 Agent")
@@ -82,6 +83,7 @@ class MessageData(BaseModel):
 
     id: str = Field(description="消息 ID")
     conversation_id: str = Field(description="所属会话 ID")
+    session_id: str | None = Field(default=None, description="发送该消息的设备会话 ID")
     role: str = Field(description="角色 (user/assistant/system/tool)")
     content: str = Field(description="消息正文")
     metadata: dict[str, Any] | None = Field(default=None, description="元数据")

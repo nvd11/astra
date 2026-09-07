@@ -7,7 +7,17 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text, func, select
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +33,12 @@ class Conversation(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    session_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("user_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="新对话")
     model: Mapped[str] = mapped_column(
         String(64), nullable=False, default="deepseek-v4-flash"
@@ -58,6 +74,12 @@ class Message(Base):
     )
     conversation_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    session_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("user_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     role: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # user | assistant | system | tool
@@ -103,6 +125,7 @@ class ConversationRepository:
         model: str = "deepseek-v4-flash",
         agent_preference: str = "auto",
         system_prompt: str | None = None,
+        session_id: str | None = None,
     ) -> Conversation:
         """创建新会话.
 
@@ -112,12 +135,14 @@ class ConversationRepository:
             model: 模型名称
             agent_preference: Agent 偏好
             system_prompt: 系统提示词
+            session_id: 发起创建的设备会话 ID (可选审计溯源)
 
         Returns:
             Conversation: 创建的会话实体
         """
         conversation = Conversation(
             user_id=user_id,
+            session_id=session_id,
             title=title,
             model=model,
             agent_preference=agent_preference,
@@ -260,6 +285,7 @@ class MessageRepository:
         content: str,
         metadata: dict[str, Any] | None = None,
         tokens_used: int | None = None,
+        session_id: str | None = None,
     ) -> Message:
         """创建一条新消息.
 
@@ -270,6 +296,7 @@ class MessageRepository:
             content: 消息内容
             metadata: 元数据 (Token 明细、推理步骤等)
             tokens_used: 消耗 Token 数
+            session_id: 登录设备会话 ID (可选审计溯源)
 
         Returns:
             Message: 创建的消息实体
@@ -277,6 +304,7 @@ class MessageRepository:
         msg = Message(
             conversation_id=conversation_id,
             user_id=user_id,
+            session_id=session_id,
             role=role,
             content=content,
             message_metadata=metadata,
