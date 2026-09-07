@@ -27,6 +27,16 @@ Astra 前端采用全端流体响应式架构，严格对标 DeepSeek Web 沉浸
    - 代码块与数学公式一律包裹 `overflow-x-auto` 独立横向滚动条，代码块右上角复制按钮与语言标签保持 `sticky` 粘性固定；
    - Agent & LLM 胶囊选择器小屏下采用隐藏滚动条的横向自由滑动容器，便于大拇指单手触达。
 
+### 1.2 动态 HTML 交互沙箱设计 (Interactive Artifacts)
+
+1. **安全沙箱隔离**：
+   - 采用原生 `iframe` 结合 `sandbox="allow-scripts allow-modals"` 属性执行 LLM 生成的 HTML/JS/CSS，**严禁使用 `allow-same-origin`**，杜绝 XSS 攻击并彻底杜绝访问宿主域 Token、Cookies 或 LocalStorage；
+2. **双态工作台组件 (`HtmlArtifactViewer.tsx`)**：
+   - 自动识别 Markdown 渲染中的 `html` 独立代码块，升级为可交互式 Artifact 卡片；
+   - 提供 `[代码 (Code)]` 与 `[预览 (Preview)]` 双选项卡自由切换；
+   - 顶部工具栏集成“一键复制代码”、“重置刷新”、“全屏弹窗预览”与“导出单文件 HTML”功能；
+   - 自动在沙箱文档头部注入 Tailwind CSS 运行时与重置样式，开箱呈现高颜值界面。
+
 ---
 
 ## 2. 目录结构总览
@@ -103,6 +113,7 @@ frontend/
 │   │   │   └── ProtectedRoute.tsx
 │   │   └── chat/
 │   │       ├── MarkdownRenderer.tsx
+│   │       ├── HtmlArtifactViewer.tsx
 │   │       ├── MessageList.tsx
 │   │       ├── MessageItem.tsx
 │   │       ├── ChatInput.tsx

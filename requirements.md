@@ -48,6 +48,7 @@
 | P1 | **用户资料页** | 头像、昵称、Logto 绑定信息、用量统计 |
 | P1 | **Agent 选择器** | 手动指定 Sub-Agent 或自动路由 |
 | P1 | **LLM 模型选择器** | 切换底层模型（DeepSeek / Gemini / Claude 等） |
+| P1 | **动态 HTML 交互沙箱 (Artifacts)** | 支持 HTML/JS/CSS 实时渲染预览与双态切换 (代码/预览)、Sandboxed iFrame 零信任安全隔离、全屏与导出 |
 | P2 | 代码块增强 | 行号、复制按钮、语言标识 |
 | P2 | 导出功能 | Markdown / PDF / PNG 导出（仅限当前用户会话） |
 
@@ -267,6 +268,42 @@ async def list_conversations(
 * **Markdown、科学公式与代码块排版保护**：
   - **代码块**：手机端严禁挤压自动换行（破换缩进），统一包裹 `overflow-x-auto` 独立横向滚动，并在右上角使用 `sticky` 粘性固定一键复制按钮与语言标签。
   - **KaTeX 公式与 GFM 表格**：行间长公式与宽表格自动注入外层响应式容器，支持手势横向平滑拖动查看，严禁撑破主页面视口宽度。
+
+---
+
+### 2.8 动态 HTML 与交互沙箱体验设计 (Interactive HTML Artifacts)
+
+**核心定位**：对标 Claude Artifacts 与 ChatGPT Canvas，当模型输出完整可执行的 HTML/JS/CSS（如游戏、交互数据图表、落地页原型、可视化小工具）时，前端自动将普通的 Markdown 代码块升格为可即时交互、操作的微应用卡片。
+
+#### 1. 零信任安全隔离架构 (Zero-Trust iFrame Sandbox)
+
+动态执行未知 LLM 代码必须死守金融级安全红线，严防 XSS 攻击与敏感凭证被窃：
+
+```html
+<iframe
+  srcdoc={sanitizedHtml}
+  sandbox="allow-scripts allow-modals"
+  csp="default-src 'self' 'unsafe-inline' https: data:;"
+  className="w-full h-full border-0 rounded-lg"
+/>
+```
+
+- **安全边界铁律**：
+  1. **严禁包含 `allow-same-origin`**：沙箱内部被浏览器强制置于无权限的 `null` 匿名源，沙箱内部 JS 绝对无法访问宿主页面的 `window.parent`、`document.cookie`、`localStorage`（JWT 凭证永不泄露）；
+  2. **网络凭证隔离**：沙箱内任何 `fetch` / `XMLHttpRequest` 调用均无法附带主应用的 Authorization 头或 Cookie，阻断对受保护 API 的非法跨站调用；
+  3. **交互放行**：保留 `allow-scripts` 允许运行 Canvas、DOM 事件与计算逻辑，保留 `allow-modals` 支持必要的 `alert` 调试。
+
+#### 2. 双态工作台交互 (Code vs Preview)
+
+- **标签页无缝切换**：
+  - `[📄 源码 (Code)]`：带语法高亮、行号及语言标记的代码视图，支持编辑与一键复制；
+  - `[▶️ 实时预览 (Preview)]`：零延迟实时挂载执行沙箱，所见即所得。
+- **工具栏实用工具**：
+  - **重置/刷新 (Reload)**：一键重新渲染沙箱 DOM，重置小游戏或动画的初始状态；
+  - **全屏聚焦 (Fullscreen Modal)**：点击放大至全屏模态框，提供沉浸式体验；
+  - **导出单文件 (Export)**：支持将当前 HTML/CSS/JS 源码一键下载为 `.html` 文件。
+- **现代样式自动增强 (Smart Runtime Injections)**：
+  - 在组装 `srcDoc` 时自动在 `<head>` 中轻量注入 Tailwind CSS Play CDN 及常用基础样式重置，确保模型生成的现代 UI 界面无需繁复配置即可开箱美观呈现。
 
 ---
 
