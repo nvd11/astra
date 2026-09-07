@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.configs.config import Settings, get_settings
 from src.engine.mysql_client import get_db_session
+from src.memory.short_term import get_short_term_memory
 from src.models.conversation import ConversationRepository, MessageRepository
 from src.models.requests import (
     CreateConversationRequest,
@@ -263,6 +264,8 @@ async def delete_conversation(
     await msg_repo.delete_by_conversation(conversation_id, current_user.id)
     # 删除会话实体
     await conv_repo.delete(conversation_id, current_user.id)
+    # 清理该会话的 L1 Redis 缓存
+    await get_short_term_memory().clear(conversation_id)
 
     logger.info(f"Deleted conversation {conversation_id} user={current_user.username}")
 
@@ -374,6 +377,9 @@ async def edit_message(
             detail="Message update failed",
         )
 
+    # 消息修改后清除该会话的 L1 缓存，确保下一轮提问从 MySQL 获取最新上下文
+    await get_short_term_memory().clear(conversation_id)
+
     return MessageResponse(
         code=0,
         message="success",
@@ -419,6 +425,8 @@ async def delete_message(
         )
 
     await msg_repo.soft_delete(message_id, current_user.id)
+    # 消息软删除后失效 L1 缓存
+    await get_short_term_memory().clear(conversation_id)
 
     return BaseResponse(
         code=0,

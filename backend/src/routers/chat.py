@@ -18,6 +18,7 @@ from src.agents.graph import astream_chat
 from src.configs.config import Settings, get_settings
 from src.engine.mysql_client import get_db_session, get_mysql_client
 from src.engine.redis_client import get_redis_client
+from src.memory.short_term import get_short_term_memory
 from src.models.conversation import ConversationRepository, MessageRepository
 from src.models.requests import SendMessageRequest, StopChatRequest
 from src.models.responses import BaseResponse, ChatStreamChunkData
@@ -59,17 +60,24 @@ async def chat_stream(
     )
     logger.info(f"Saved user message id={user_msg.id} for conv={conv.id}")
 
-    # 3. 拉取最近历史消息构造多轮对话上下文 (取最近 20 条未删除消息)
-    history_messages, _ = await msg_repo.list_by_conversation(
-        conversation_id=conv.id,
-        user_id=current_user.id,
-        page=1,
-        page_size=20,
-    )
-
-    llm_context: list[dict[str, str]] = [
-        {"role": m.role, "content": m.content} for m in history_messages
-    ]
+    # 3. 构建多轮上下文：优先读 L1 Redis 缓存加速；未命中穿透至 MySQL 并回填 Redis
+    memory = get_short_term_memory()
+    cached_context = await memory.get_context(conv.id)
+    if cached_context is not None:
+        cached_context.append({"role": "user", "content": request.content})
+        llm_context = cached_context[-20:]
+        await memory.set_context(conv.id, llm_context)
+    else:
+        history_messages, _ = await msg_repo.list_by_conversation(
+            conversation_id=conv.id,
+            user_id=current_user.id,
+            page=1,
+            page_size=20,
+        )
+        llm_context = [
+            {"role": m.role, "content": m.content} for m in history_messages
+        ]
+        await memory.set_context(conv.id, llm_context)
 
     # 确定模型与 Agent 偏好
     model = request.model_override or conv.model or settings.default_model
@@ -143,9 +151,16 @@ async def chat_stream(
             with contextlib.suppress(Exception):
                 await redis_client.delete(stop_key)
 
-            # 4. 流式结束：开启新的独立 session 将 Assistant 消息持久化入库
+            # 4. 流式结束：开启新的独立 session 将 Assistant 消息持久化入库，并追加 L1 缓存
             full_response_text = "".join(collected_chunks)
             if full_response_text:
+                # 顺手将 Assistant 回复写入 L1 会话缓存
+                await memory.append_message(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=full_response_text,
+                )
+
                 try:
                     mysql = get_mysql_client()
                     async with mysql.session_scope() as session:
