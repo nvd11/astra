@@ -16,46 +16,46 @@
 
 ```mermaid
 flowchart TB
-    subgraph ClientLayer [客户端层]
-        WebUI[React 18 前端 / Web UI]
+    subgraph ClientLayer ["客户端层"]
+        WebUI["React 18 前端 / Web UI"]
     end
 
-    subgraph GatewayLayer [接入层]
-        Kong[Kong Ingress Gateway<br/>/api 路由前缀]
+    subgraph GatewayLayer ["接入层"]
+        Kong["Kong Ingress Gateway<br/>/api 路由前缀"]
     end
 
-    subgraph ServiceLayer [Astra 后端服务集群]
-        FastAPI[FastAPI 异步核心<br/>Uvicorn Multi-Workers]
-        RateLimit[RateLimitMiddleware<br/>滑动窗口防刷]
-        Router[Chat Router<br/>SSE 打字机生成器]
-        AgentGraph[LangGraph StateGraph<br/>智能体意图路由]
+    subgraph ServiceLayer ["Astra 后端服务集群"]
+        FastAPI["FastAPI 异步核心<br/>Uvicorn Multi-Workers"]
+        RateLimit["RateLimitMiddleware<br/>滑动窗口防刷"]
+        Router["Chat Router<br/>SSE 打字机生成器"]
+        AgentGraph["LangGraph StateGraph<br/>智能体意图路由"]
     end
 
-    subgraph CacheLayer [高速缓存与信标层]
-        Redis[Redis 7.x 实例<br/>100.105.130.0:6379]
-        L1Cache[conv:*:context<br/>L1 多轮上下文加速]
-        StopSignal[chat:stop:*<br/>异步推理中止信标]
-        RateLimitKey[rate_limit:*:*<br/>RPM 计数器]
+    subgraph CacheLayer ["高速缓存与信标层"]
+        Redis[("Redis 7.x 实例<br/>100.105.130.0:6379")]
+        L1Cache["conv:*:context<br/>L1 多轮上下文加速"]
+        StopSignal["chat:stop:*<br/>异步推理中止信标"]
+        RateLimitKey["rate_limit:*:*<br/>RPM 计数器"]
     end
 
-    subgraph PersistentLayer [持久化与推理基础设施]
-        MySQL[(OCI MySQL HeatWave<br/>conversations & messages)]
-        LiteLLM[私有 LiteLLM 网关<br/>https://gw.jppwl.asia/litellm]
+    subgraph PersistentLayer ["持久化与推理基础设施"]
+        MySQL[("OCI MySQL HeatWave<br/>conversations and messages")]
+        LiteLLM["私有 LiteLLM 网关<br/>https://gw.jppwl.asia/litellm"]
     end
 
     WebUI -->|HTTP / SSE| Kong
     Kong --> RateLimit
-    RateLimit -->|1. 校验并发频次| RateLimitKey
+    RateLimit -->|"1. 校验并发频次"| RateLimitKey
     RateLimit --> FastAPI
     FastAPI --> Router
-    Router -->|2. 优先提取上下文| L1Cache
-    L1Cache -.->|未命中穿透回填| MySQL
+    Router -->|"2. 优先提取上下文"| L1Cache
+    L1Cache -.->|"未命中穿透回填"| MySQL
     Router --> AgentGraph
-    AgentGraph -->|3. 发起流式推理| LiteLLM
-    LiteLLM -->|4. SSE 逐字推流| Router
-    Router -.->|5. 实时检测中止信号| StopSignal
-    Router -->|6. 流毕即时落库| MySQL
-    Router -->|7. 顺手刷新 L1 缓存| L1Cache
+    AgentGraph -->|"3. 发起流式推理"| LiteLLM
+    LiteLLM -->|"4. SSE 逐字推流"| Router
+    Router -.->|"5. 实时检测中止信号"| StopSignal
+    Router -->|"6. 流毕即时落库"| MySQL
+    Router -->|"7. 顺手刷新 L1 缓存"| L1Cache
 ```
 
 本文将结合在生产集群（K3s + OCI ARM + OCI MySQL HeatWave + Redis）中经过 100% 真实全场景检验的工程实践，详细拆解 Redis 的四大实战场景。
@@ -199,21 +199,21 @@ AI 对话接口是全站算力开销最昂贵的端点，极易成为爬虫抓�
 ### 4.3 Mermaid 流程图
 ```mermaid
 flowchart TD
-    Start([客户端 HTTP 请求到达]) --> PathCheck{是否为健康检查/文档白名单?}
-    PathCheck -- 是 --> Allow[直接放行进入下游 Router]
+    Start(["客户端 HTTP 请求到达"]) --> PathCheck{"是否为健康检查/文档白名单?"}
+    PathCheck -- 是 --> Allow["直接放行进入下游 Router"]
     
-    PathCheck -- 否 --> KeyGen[计算当前时间分桶: int(time / 60)<br/>Key: rate_limit:IP:Bucket]
-    KeyGen --> RedisIncr[Redis 原子递增: INCR key]
+    PathCheck -- 否 --> KeyGen["计算当前时间分桶: int(time / 60)<br/>Key: rate_limit:IP:Bucket"]
+    KeyGen --> RedisIncr["Redis 原子递增: INCR key"]
     
-    RedisIncr --> IsNew{Count == 1 ?<br/>(窗口首次请求)}
-    IsNew -- 是 --> SetTTL[设置过期时间: EXPIRE key 65s]
-    IsNew -- 否 --> CheckThreshold{Count > 阈值 (120 RPM)?}
+    RedisIncr --> IsNew{"Count == 1 ?<br/>(窗口首次请求)"}
+    IsNew -- 是 --> SetTTL["设置过期时间: EXPIRE key 65s"]
+    IsNew -- 否 --> CheckThreshold{"Count > 阈值 (120 RPM)?"}
     SetTTL --> CheckThreshold
     
     CheckThreshold -- 否 (正常频次) --> Allow
-    CheckThreshold -- 是 (异常高频) --> Block[拦截请求!<br/>返回 HTTP 429 Too Many Requests<br/>响应头携带: Retry-After: 60]
+    CheckThreshold -- 是 (异常高频) --> Block["拦截请求!<br/>返回 HTTP 429 Too Many Requests<br/>响应头携带: Retry-After: 60"]
     
-    RedisIncr -.->|Redis 异常或连接超时| FailOpen[Fail-Open 保护降级: 打印 Debug 日志，放行请求]
+    RedisIncr -.->|Redis 异常或连接超时| FailOpen["Fail-Open 保护降级: 打印 Debug 日志，放行请求"]
     FailOpen --> Allow
 ```
 
