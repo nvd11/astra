@@ -22,6 +22,12 @@
 * **用户归属显式冗余**：业务大表（`conversations`、`messages`、`user_sessions`、`knowledge_documents`、`document_chunks`）均**强制显式包含 `user_id` 列**并建立前缀索引；
 * **单表聚合优化**：跨多级关联的大表查询（如统计用户累计 Token 消耗）无需进行昂贵的表 `JOIN`，单表基于 `WHERE user_id = :uid` 即可高效聚合。
 
+### 1.4 全链路设备溯源与金融级审计链 (Audit Trail & Device Traceability)
+* **会话与消息关联 `session_id`**：
+  - 在大模型企业级内控与合规场景下，单纯记录 `user_id` 只能定位操作主体，无法定位物理设备。若账号遭遇异地盗用或敏感数据外发，必须具备追溯到**具体登录会话、客户端环境及公网 IP** 的能力；
+  - `conversations` 与 `messages` 表均显式建立 `session_id` 外键与索引，指向 `user_sessions(id)`；
+  - **解耦保护策略 (`ON DELETE SET NULL`)**：当用户的登录设备会话自然过期或被管理员踢出删除时，历史对话和问答数据绝对不受影响，关联字段自动平滑置 NULL，兼顾审计链条完整性与数据生命周期灵活性。
+
 ---
 
 ## 2. 实体关系图 (Entity-Relationship Diagram)
@@ -32,6 +38,8 @@ erDiagram
     users ||--o{ conversations : "拥有多个对话会话"
     users ||--o{ messages : "发送/接收消息(行级隔离)"
     users ||--o{ knowledge_documents : "上传专属知识文档"
+    user_sessions ||--o{ conversations : "初次创建设备会话"
+    user_sessions ||--o{ messages : "具体发送设备会话(审计链路)"
     conversations ||--o{ messages : "包含多轮问答流水"
     knowledge_documents ||--o{ document_chunks : "切分为多个向量分片"
 
@@ -62,6 +70,7 @@ erDiagram
     conversations {
         varchar(36) id PK "会话唯一UUID"
         varchar(36) user_id FK,IDX "租户用户ID(行级隔离核心)"
+        varchar(36) session_id FK,IDX "发起创建设备会话ID(可为NULL)"
         varchar(255) title "会话展示标题"
         varchar(64) model "会话绑定LLM模型"
         varchar(64) agent_preference "会话绑定智能体模式"
@@ -75,6 +84,7 @@ erDiagram
         varchar(36) id PK "消息唯一UUID"
         varchar(36) conversation_id FK,IDX "所属会话UUID"
         varchar(36) user_id FK,IDX "所属用户ID(双重隔离)"
+        varchar(36) session_id FK,IDX "具体发送设备会话ID(审计追溯)"
         varchar(20) role "角色: user|assistant|system|tool"
         text content "消息文本正文"
         json metadata "模型响应元数据与思维链"
@@ -97,8 +107,8 @@ erDiagram
         varchar(36) id PK "切片唯一UUID"
         varchar(36) document_id FK,IDX "所属文档UUID"
         varchar(36) user_id FK,IDX "文档归属用户ID"
-        int chunk_index "切片递增序号"
-        text content "分片纯文本正文"
+        int chunk_index "切片序号"
+        text content "切片文本内容"
         json embedding "VECTOR(1536) 向量数据"
         json metadata "分片元数据(页码/标签)"
         datetime created_at "向量化时间"
@@ -187,6 +197,7 @@ CREATE TABLE `user_sessions` (
 CREATE TABLE `conversations` (
   `id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_id` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '新对话',
   `model` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'gemini-3.8-flash',
   `agent_preference` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'auto',
@@ -196,8 +207,10 @@ CREATE TABLE `conversations` (
   `updated_at` datetime NOT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_conversations_user_id` (`user_id`),
+  KEY `ix_conversations_session_id` (`session_id`),
   KEY `ix_conversations_updated_at` (`updated_at`),
-  KEY `ix_conversations_is_archived` (`is_archived`)
+  KEY `ix_conversations_is_archived` (`is_archived`),
+  CONSTRAINT `fk_conversations_session` FOREIGN KEY (`session_id`) REFERENCES `user_sessions` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 * **字段详解**：
@@ -205,6 +218,7 @@ CREATE TABLE `conversations` (
   |---|---|---|---|---|
   | `id` | VARCHAR(36) | NOT NULL | UUID | 会话唯一主键 |
   | `user_id` | VARCHAR(36) | NOT NULL | 无 | 所属用户 ID（**强行级隔离索引**） |
+  | `session_id` | VARCHAR(36) | NULL | NULL | 初次创建该会话的设备会话 ID（**关联 `user_sessions.id`，设备审计**） |
   | `title` | VARCHAR(255) | NOT NULL | `新对话` | 会话标题（前端左侧抽屉展示名称） |
   | `model` | VARCHAR(64) | NOT NULL | `gemini-3.8-flash` | 该会话默认绑定调用的 LLM 模型 |
   | `agent_preference` | VARCHAR(64) | NOT NULL | `auto` | 智能体偏好（`auto`/`code_assistant`/`deep_reasoner`/`direct_chat`） |
@@ -224,6 +238,7 @@ CREATE TABLE `messages` (
   `id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `conversation_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `user_id` varchar(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `session_id` varchar(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `content` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `metadata` json DEFAULT NULL,
@@ -234,8 +249,10 @@ CREATE TABLE `messages` (
   PRIMARY KEY (`id`),
   KEY `ix_messages_conversation_id` (`conversation_id`),
   KEY `ix_messages_user_id` (`user_id`),
+  KEY `ix_messages_session_id` (`session_id`),
   KEY `ix_messages_created_at` (`created_at`),
-  KEY `ix_messages_is_deleted` (`is_deleted`)
+  KEY `ix_messages_is_deleted` (`is_deleted`),
+  CONSTRAINT `fk_messages_session` FOREIGN KEY (`session_id`) REFERENCES `user_sessions` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 * **字段详解**：
@@ -244,6 +261,7 @@ CREATE TABLE `messages` (
   | `id` | VARCHAR(36) | NOT NULL | UUID | 消息唯一主键 |
   | `conversation_id` | VARCHAR(36) | NOT NULL | 无 | 所属会话 ID（会话内历史消息检索索引） |
   | `user_id` | VARCHAR(36) | NOT NULL | 无 | 所属用户 ID（**冗余设计：支持零 JOIN 统计用量**） |
+  | `session_id` | VARCHAR(36) | NULL | NULL | 发送该条消息的登录设备会话 ID（**跨表审计溯源外键**） |
   | `role` | VARCHAR(20) | NOT NULL | 无 | 消息角色：`user`、`assistant`、`system`、`tool` |
   | `content` | TEXT | NOT NULL | 无 | 消息正文（Markdown 文本、公式或代码片段） |
   | `metadata` | JSON | NULL | NULL | 结构化元数据（实际模型、响应 Agent、finish_reason 等） |
@@ -356,12 +374,35 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
 | **会话列表分页** | `GET /conversations` | `SELECT * FROM conversations WHERE user_id = :uid AND is_archived = 0 ORDER BY updated_at DESC LIMIT 20;` | `ix_conversations_user_id`, `ix_conversations_updated_at` | `< 2ms` |
 | **多轮对话上下文回溯** | `POST /chat/stream` | `SELECT role, content FROM messages WHERE conversation_id = :cid AND user_id = :uid AND is_deleted = 0 ORDER BY created_at ASC LIMIT 20;` | `ix_messages_conversation_id`, `ix_messages_created_at` | `< 3ms` |
 | **用户实时用量聚合** | `GET /users/stats` | `SELECT COUNT(id), COALESCE(SUM(tokens_used), 0) FROM messages WHERE user_id = :uid AND is_deleted = 0;` | `ix_messages_user_id` | `< 4ms` |
+| **金融级设备审计与全链路追溯 (Audit Trail)** | 审计与风控查询 | `SELECT u.username, s.device_info, s.ip_address, c.title, m.role, m.content, m.created_at FROM messages m JOIN user_sessions s ON m.session_id = s.id JOIN users u ON m.user_id = u.id JOIN conversations c ON m.conversation_id = c.id WHERE m.user_id = :uid ORDER BY m.created_at DESC LIMIT 50;` | `ix_messages_user_id`, `ix_messages_session_id`, `PRIMARY` | `< 5ms` |
 | **单消息软删除** | `DELETE /messages/{id}` | `UPDATE messages SET is_deleted = 1, updated_at = UTC_TIMESTAMP() WHERE id = :mid AND user_id = :uid;` | `PRIMARY KEY (id)` | `< 1ms` |
 | **踢出用户全部会话** | `DELETE /sessions` | `DELETE FROM user_sessions WHERE user_id = :uid AND refresh_token != :current_token;` | `ix_user_sessions_user_id` | `< 2ms` |
 
 ---
 
-## 6. 初始化与权限授予脚本 (`init_db.sql`)
+## 6. 在线表结构升级脚本 (Online Migration DDL)
+
+若数据库已有历史数据，需要平滑升级引入 `session_id` 关联字段，可直接执行以下无损变更 SQL：
+
+```sql
+-- 1. 为 conversations 表追加 session_id 审计列与索引
+ALTER TABLE `conversations`
+    ADD COLUMN `session_id` VARCHAR(36) NULL AFTER `user_id`,
+    ADD KEY `ix_conversations_session_id` (`session_id`),
+    ADD CONSTRAINT `fk_conversations_session` 
+        FOREIGN KEY (`session_id`) REFERENCES `user_sessions` (`id`) ON DELETE SET NULL;
+
+-- 2. 为 messages 表追加 session_id 审计列与索引
+ALTER TABLE `messages`
+    ADD COLUMN `session_id` VARCHAR(36) NULL AFTER `user_id`,
+    ADD KEY `ix_messages_session_id` (`session_id`),
+    ADD CONSTRAINT `fk_messages_session` 
+        FOREIGN KEY (`session_id`) REFERENCES `user_sessions` (`id`) ON DELETE SET NULL;
+```
+
+---
+
+## 7. 初始化与权限授予脚本 (`init_db.sql`)
 
 在新的生产数据库实例初始化时，由管理员（`root` / `admin`）执行以下标准脚本：
 
