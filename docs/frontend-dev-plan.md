@@ -12,6 +12,21 @@
 
 本文档基于 `requirements.md` 第 2.1 节前端功能需求与第 7.1 节 Monorepo 结构，为 Astra 项目前端提供**逐文件、逐函数/组件级别**的开发计划。技术栈为 **React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui + Zustand + React Router + Axios + react-markdown + remark-gfm + rehype-katex + react-syntax-highlighter**。
 
+### 1.1 响应式全端设计与断点规范 (Mobile & Desktop)
+
+Astra 前端采用全端流体响应式架构，严格对标 DeepSeek Web 沉浸式交互：
+
+1. **设备断点与布局形态**：
+   - **移动端 (`< 768px / sm`)**：单栏极简对话流，侧边栏收起至由汉堡菜单触发的抽屉浮层（Drawer Sheet）；
+   - **平板端 (`768px ~ 1023px / md`)**：弹性侧边栏，支持手势轻扫呼出；
+   - **桌面端 (`≥ 1024px / lg`)**：经典三栏/两栏工作台，左侧固定 260px 侧边栏，支持快捷键 `Ctrl/Cmd + B` 丝滑折叠展开。
+2. **移动端视口与软键盘保护**：
+   - 全局高度基准采用现代 CSS `100dvh`，杜绝 iOS Safari / Android Chrome 动态地址栏缩放抖动；
+   - 挂载 `useVirtualKeyboard` Hook 监听 `window.visualViewport` 变化，软键盘弹起时输入框无缝悬浮吸顶于键盘上沿，防止光标溢出可视区。
+3. **内容组件小屏保护**：
+   - 代码块与数学公式一律包裹 `overflow-x-auto` 独立横向滚动条，代码块右上角复制按钮与语言标签保持 `sticky` 粘性固定；
+   - Agent & LLM 胶囊选择器小屏下采用隐藏滚动条的横向自由滑动容器，便于大拇指单手触达。
+
 ---
 
 ## 2. 目录结构总览
@@ -70,6 +85,8 @@ frontend/
 │   │   ├── useMessages.ts
 │   │   ├── useTheme.ts
 │   │   ├── useLocalStorage.ts
+│   │   ├── useMediaQuery.ts
+│   │   ├── useVirtualKeyboard.ts
 │   │   └── useSSE.ts
 │   ├── components/
 │   │   ├── common/
@@ -82,6 +99,7 @@ frontend/
 │   │   │   ├── MainLayout.tsx
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── Header.tsx
+│   │   │   ├── MobileNavDrawer.tsx
 │   │   │   └── ProtectedRoute.tsx
 │   │   └── chat/
 │   │       ├── MarkdownRenderer.tsx
