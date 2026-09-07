@@ -58,7 +58,7 @@ erDiagram
 
     user_sessions {
         varchar(36) id PK "会话记录UUID"
-        varchar(36) user_id FK,IDX "所属用户ID"
+        varchar(36) user_id FK "所属用户ID"
         text refresh_token "长效安全刷新令牌"
         varchar(255) device_info "登录设备及浏览器指纹"
         varchar(45) ip_address "登录客户端IPv4/IPv6"
@@ -69,34 +69,34 @@ erDiagram
 
     conversations {
         varchar(36) id PK "会话唯一UUID"
-        varchar(36) user_id FK,IDX "租户用户ID(行级隔离核心)"
-        varchar(36) session_id FK,IDX "发起创建设备会话ID(可为NULL)"
+        varchar(36) user_id FK "租户用户ID(行级隔离核心)"
+        varchar(36) session_id FK "发起创建设备会话ID(可为NULL)"
         varchar(255) title "会话展示标题"
         varchar(64) model "会话绑定LLM模型"
         varchar(64) agent_preference "会话绑定智能体模式"
         text system_prompt "会话定制系统提示词"
-        tinyint(1) is_archived IDX "归档标记(0:活跃 1:已归档)"
+        tinyint(1) is_archived "归档标记(0:活跃 1:已归档)"
         datetime created_at "创建时间"
-        datetime updated_at IDX "更新时间(会话列表排序核心)"
+        datetime updated_at "更新时间(会话列表排序核心)"
     }
 
     messages {
         varchar(36) id PK "消息唯一UUID"
-        varchar(36) conversation_id FK,IDX "所属会话UUID"
-        varchar(36) user_id FK,IDX "所属用户ID(双重隔离)"
-        varchar(36) session_id FK,IDX "具体发送设备会话ID(审计追溯)"
+        varchar(36) conversation_id FK "所属会话UUID"
+        varchar(36) user_id FK "所属用户ID(双重隔离)"
+        varchar(36) session_id FK "具体发送设备会话ID(审计追溯)"
         varchar(20) role "角色: user|assistant|system|tool"
         text content "消息文本正文"
         json metadata "模型响应元数据与思维链"
         int tokens_used "该条消息消耗的Token数"
-        tinyint(1) is_deleted IDX "软删除标记(0:正常 1:已删除)"
-        datetime created_at IDX "发送时间戳(历史时序排序)"
+        tinyint(1) is_deleted "软删除标记(0:正常 1:已删除)"
+        datetime created_at "发送时间戳(历史时序排序)"
         datetime updated_at "消息修改时间"
     }
 
     knowledge_documents {
         varchar(36) id PK "文档唯一UUID"
-        varchar(36) user_id FK,IDX "文档归属用户ID"
+        varchar(36) user_id FK "文档归属用户ID"
         varchar(255) title "知识库文档名称"
         varchar(32) file_type "文件类型(pdf/txt/md)"
         int chunk_count "拆分文本块总数"
@@ -105,8 +105,8 @@ erDiagram
 
     document_chunks {
         varchar(36) id PK "切片唯一UUID"
-        varchar(36) document_id FK,IDX "所属文档UUID"
-        varchar(36) user_id FK,IDX "文档归属用户ID"
+        varchar(36) document_id FK "所属文档UUID"
+        varchar(36) user_id FK "文档归属用户ID"
         int chunk_index "切片序号"
         text content "切片文本内容"
         json embedding "VECTOR(1536) 向量数据"
