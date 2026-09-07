@@ -109,6 +109,16 @@ class Settings(BaseSettings):
     workers: int = Field(default=1, ge=1, le=8, description="Worker 数量")
     root_path: str = Field(default="", description="API 根路径")
 
+    # ========== CORS 跨域配置 ==========
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            "https://astra.jppwl.asia",
+            "http://localhost:3000",
+            "http://localhost:5173",
+        ],
+        description="跨域允许的来源列表",
+    )
+
     # ========== 日志配置 ==========
     log_level: str = Field(default="INFO", description="日志级别")
 

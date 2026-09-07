@@ -8,18 +8,20 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.configs.config import Settings, get_settings
 from src.engine.mysql_client import get_db_session
+from src.middleware.rate_limit import extract_client_ip
 from src.models.requests import LoginRequest, LogtoCallbackRequest, RefreshTokenRequest
 from src.models.responses import (
     BaseResponse,
     TokenResponse,
     TokenResponseData,
     UserInfoData,
+    UserInfoResponse,
 )
 from src.models.user import SessionRepository, User, UserRepository
 from src.services.auth import get_current_user
@@ -37,6 +39,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 )
 async def login(
     request: LoginRequest,
+    raw_request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TokenResponse:
@@ -44,6 +47,7 @@ async def login(
 
     Args:
         request: 登录请求
+        raw_request: 原生 HTTP 请求 (提取 IP 与 UA)
         settings: 应用配置
         db: 数据库会话
 
@@ -81,12 +85,10 @@ async def login(
     access_token = jwt_manager.create_access_token(user.id, user.username)
     refresh_token = jwt_manager.create_refresh_token(user.id, user.username)
 
-    # 签发令牌
-    jwt_manager = get_jwt_manager()
-    access_token = jwt_manager.create_access_token(user.id, user.username)
-    refresh_token = jwt_manager.create_refresh_token(user.id, user.username)
+    # 保存会话 (捕获真实客户端 IP 与 UA 设备信息)
+    client_ip = extract_client_ip(raw_request)
+    device_info = raw_request.headers.get("User-Agent") or "Web Browser"
 
-    # 保存会话
     session_repo = SessionRepository(db)
     expires_at = datetime.now(UTC) + timedelta(
         days=settings.jwt_refresh_token_expire_days
@@ -94,8 +96,8 @@ async def login(
     await session_repo.create(
         user_id=user.id,
         refresh_token=refresh_token,
-        device_info="Web Browser",
-        ip_address="127.0.0.1",
+        device_info=device_info[:255],
+        ip_address=client_ip,
         expires_at=expires_at,
     )
 
@@ -162,6 +164,7 @@ async def logto_authorize(
 )
 async def logto_callback(
     request: LogtoCallbackRequest,
+    raw_request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TokenResponse:
@@ -169,6 +172,7 @@ async def logto_callback(
 
     Args:
         request: 回调请求
+        raw_request: 原生 HTTP 请求 (提取 IP 与 UA)
         settings: 应用配置
         db: 数据库会话
 
@@ -206,7 +210,10 @@ async def logto_callback(
     access_token = jwt_manager.create_access_token(user.id, user.username)
     refresh_token = jwt_manager.create_refresh_token(user.id, user.username)
 
-    # 保存会话
+    # 保存会话 (捕获真实客户端 IP 与 UA 设备信息)
+    client_ip = extract_client_ip(raw_request)
+    device_info = raw_request.headers.get("User-Agent") or "Web Browser"
+
     session_repo = SessionRepository(db)
     expires_at = datetime.now(UTC) + timedelta(
         days=settings.jwt_refresh_token_expire_days
@@ -214,8 +221,8 @@ async def logto_callback(
     await session_repo.create(
         user_id=user.id,
         refresh_token=refresh_token,
-        device_info="Web Browser",
-        ip_address="127.0.0.1",
+        device_info=device_info[:255],
+        ip_address=client_ip,
         expires_at=expires_at,
     )
 
@@ -349,22 +356,24 @@ async def logout(
 
 @router.get(
     "/me",
-    response_model=BaseResponse[UserInfoData],
+    response_model=UserInfoResponse,
     summary="获取当前用户信息",
     description="获取当前认证用户的详细资料",
 )
 async def get_me(
     current_user: Annotated[User, Depends(get_current_user)],
-) -> BaseResponse[UserInfoData]:
+) -> UserInfoResponse:
     """获取当前用户信息端点.
 
     Args:
         current_user: 当前用户 (依赖注入)
 
     Returns:
-        BaseResponse[UserInfoData]: 用户信息
+        UserInfoResponse: 用户信息
     """
-    return BaseResponse(
+    return UserInfoResponse(
+        code=0,
+        message="success",
         data=UserInfoData(
             id=current_user.id,
             username=current_user.username,
@@ -374,5 +383,5 @@ async def get_me(
             default_model=current_user.default_model,
             default_agent=current_user.default_agent,
             created_at=current_user.created_at,
-        )
+        ),
     )

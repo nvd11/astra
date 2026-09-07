@@ -434,6 +434,35 @@ class MessageRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one() or 0
 
+    async def get_message_counts_by_conversations(
+        self,
+        conversation_ids: list[str],
+        user_id: str,
+    ) -> dict[str, int]:
+        """批量获取多个会话各自的未删除消息总数 (消除 N+1 查询).
+
+        Args:
+            conversation_ids: 会话 ID 列表
+            user_id: 用户 ID
+
+        Returns:
+            dict[str, int]: 会话 ID 到消息数的映射字典
+        """
+        if not conversation_ids:
+            return {}
+
+        stmt = (
+            select(Message.conversation_id, func.count(Message.id))
+            .where(
+                Message.conversation_id.in_(conversation_ids),
+                Message.user_id == user_id,
+                Message.is_deleted == False,  # noqa: E712
+            )
+            .group_by(Message.conversation_id)
+        )
+        result = await self.session.execute(stmt)
+        return dict(result.tuples().all())
+
     async def update_content(
         self,
         message_id: str,

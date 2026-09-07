@@ -5,7 +5,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,10 @@ async def list_sessions(
     current_user: Annotated[User, Depends(get_current_user)],
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    current_session_id: Annotated[
+        str | None,
+        Header(alias="X-Session-ID", description="当前客户端会话ID"),
+    ] = None,
 ) -> SessionListResponse:
     """获取当前用户所有会话.
 
@@ -35,6 +39,7 @@ async def list_sessions(
         current_user: 当前用户
         settings: 应用配置
         db: 数据库会话
+        current_session_id: 当前客户端会话 ID (用于标识 is_current)
 
     Returns:
         SessionListResponse: 会话列表
@@ -52,7 +57,7 @@ async def list_sessions(
             ip_address=session.ip_address,
             last_active_at=session.last_active_at,
             expires_at=session.expires_at,
-            is_current=False,  # TODO: 从请求中识别当前会话
+            is_current=bool(current_session_id and session.id == current_session_id),
         )
         for session in sessions
     ]
@@ -93,15 +98,11 @@ async def delete_session(
 
     try:
         session_repo = SessionRepository(db)
-        sessions = await session_repo.get_by_user_id(current_user.id)
-
-        target_session = next((s for s in sessions if s.id == session_id), None)
-        if not target_session:
+        deleted = await session_repo.delete_by_id(session_id, current_user.id)
+        if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
             )
-
-        await session_repo.delete_by_refresh_token(target_session.refresh_token)
         logger.info(f"Deleted session {session_id} for user {current_user.username}")
     except HTTPException:
         raise

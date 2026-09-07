@@ -63,10 +63,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS 配置
+    # CORS 配置 (从统一 Settings 体系加载)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["https://astra.jppwl.asia", "http://localhost:5173"],
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
