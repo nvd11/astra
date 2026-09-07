@@ -74,9 +74,7 @@ async def chat_stream(
             page=1,
             page_size=20,
         )
-        llm_context = [
-            {"role": m.role, "content": m.content} for m in history_messages
-        ]
+        llm_context = [{"role": m.role, "content": m.content} for m in history_messages]
         await memory.set_context(conv.id, llm_context)
 
     # 确定模型与 Agent 偏好
