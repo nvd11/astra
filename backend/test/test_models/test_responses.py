@@ -135,6 +135,7 @@ class TestConversationData:
         now = datetime.utcnow()
         data = ConversationData(
             id="conv-123",
+            session_id="session-xyz",
             title="测试会话",
             model="deepseek-v4-flash",
             agent_preference="auto",
@@ -145,6 +146,7 @@ class TestConversationData:
             message_count=5,
         )
         assert data.id == "conv-123"
+        assert data.session_id == "session-xyz"
         assert data.title == "测试会话"
         assert data.model == "deepseek-v4-flash"
         assert data.agent_preference == "auto"
@@ -162,6 +164,7 @@ class TestMessageData:
         data = MessageData(
             id="msg-123",
             conversation_id="conv-123",
+            session_id="session-xyz",
             role="user",
             content="你好",
             metadata={"key": "value"},
@@ -169,6 +172,7 @@ class TestMessageData:
             created_at=now,
         )
         assert data.id == "msg-123"
+        assert data.session_id == "session-xyz"
         assert data.conversation_id == "conv-123"
         assert data.role == "user"
         assert data.content == "你好"

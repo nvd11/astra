@@ -423,3 +423,85 @@ class TestLiveAPIE2E:
         # 验证 API 统计值与物理数据库记录完全吻合
         assert api_stats["total_conversations"] == db_conv_count
         assert api_stats["total_messages"] == db_msg_count
+
+    # ========================================================
+    # 场景 8: 金融级全链路设备审计与四表联查溯源测试 (session_id)
+    # ========================================================
+    async def test_08_audit_trail_device_traceability(
+        self,
+        http_client: httpx.AsyncClient,
+        db_conn: asyncmy.Connection,
+    ):
+        """测试 8: 真实设备会话登记 -> 提问附加 session_id -> 执行金融级四表联查回溯设备与 IP."""
+        test_session_id = str(uuid.uuid4())
+        device_name = "MacBook Pro (M3 Max / macOS 15.1)"
+        client_ip = "10.0.1.3"
+
+        async with db_conn.cursor() as cur:
+            await cur.execute("SELECT id FROM users LIMIT 1;")
+            user_row = await cur.fetchone()
+            if not user_row:
+                user_id = "anonymous"
+                await cur.execute(
+                    "INSERT IGNORE INTO users (id, username, preferences, default_model, default_agent, created_at, updated_at) "
+                    "VALUES ('anonymous', 'anonymous', '{}', 'gemini-3.8-flash', 'auto', NOW(), NOW());"
+                )
+            else:
+                user_id = user_row[0]
+
+            await cur.execute(
+                """
+                INSERT INTO user_sessions (id, user_id, refresh_token, device_info, ip_address, last_active_at, expires_at, created_at)
+                VALUES (%s, %s, 'test-refresh-token', %s, %s, NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY), NOW());
+                """,
+                (test_session_id, user_id, device_name, client_ip),
+            )
+
+        # 携带 X-Session-ID 创建会话
+        conv_resp = await http_client.post(
+            "/conversations",
+            headers={"X-Session-ID": test_session_id},
+            json={"title": "设备审计溯源会话"},
+        )
+        assert conv_resp.status_code == 201
+        conv_id = conv_resp.json()["data"]["id"]
+
+        # 携带 X-Session-ID 发送对话消息
+        audit_prompt = "Audit message from trusted corporate device."
+        async with http_client.stream(
+            "POST",
+            "/chat/stream",
+            headers={"X-Session-ID": test_session_id},
+            json={"conversation_id": conv_id, "content": audit_prompt},
+        ) as stream_resp:
+            async for _ in stream_resp.aiter_lines():
+                pass
+
+        await asyncio.sleep(1)
+
+        # 执行金融级四表联查审计 SQL
+        async with db_conn.cursor() as cur:
+            sql = """
+                SELECT
+                    u.username,
+                    s.device_info,
+                    s.ip_address,
+                    c.title AS conversation_title,
+                    m.role,
+                    m.content
+                FROM messages m
+                JOIN user_sessions s ON m.session_id = s.id
+                JOIN users u ON m.user_id = u.id
+                JOIN conversations c ON m.conversation_id = c.id
+                WHERE m.conversation_id = %s AND m.role = 'user';
+            """
+            await cur.execute(sql, (conv_id,))
+            audit_result = await cur.fetchone()
+
+            assert audit_result is not None
+            _, db_device, db_ip, db_conv_title, role, content = audit_result
+            assert db_device == device_name
+            assert db_ip == client_ip
+            assert db_conv_title == "设备审计溯源会话"
+            assert content == audit_prompt
+            assert role == "user"

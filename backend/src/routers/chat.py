@@ -9,7 +9,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +38,10 @@ async def chat_stream(
     current_user: Annotated[User, Depends(get_current_user)],
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    session_id: Annotated[
+        str | None,
+        Header(alias="X-Session-ID", description="可选设备会话ID"),
+    ] = None,
 ) -> StreamingResponse:
     """SSE 流式对话补全端点."""
     conv_repo = ConversationRepository(db)
@@ -51,10 +55,11 @@ async def chat_stream(
             detail="Conversation not found",
         )
 
-    # 2. 保存用户消息到数据库
+    # 2. 保存用户消息到数据库 (附加设备 session_id 审计溯源)
     user_msg = await msg_repo.create(
         conversation_id=conv.id,
         user_id=current_user.id,
+        session_id=session_id,
         role="user",
         content=request.content,
     )
@@ -168,6 +173,7 @@ async def chat_stream(
                         await persist_msg_repo.create(
                             conversation_id=conversation_id,
                             user_id=user_id,
+                            session_id=session_id,
                             role="assistant",
                             content=full_response_text,
                             metadata={

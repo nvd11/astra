@@ -39,8 +39,10 @@ class TestConversationRepository:
             model="deepseek-v4-flash",
             agent_preference="auto",
             system_prompt="You are helpful",
+            session_id="session-device-1",
         )
         assert conv.user_id == "user-123"
+        assert conv.session_id == "session-device-1"
         assert conv.title == "测试对话"
         assert conv.model == "deepseek-v4-flash"
         assert conv.agent_preference == "auto"
@@ -165,9 +167,11 @@ class TestMessageRepository:
             content="你好",
             metadata={"step": 1},
             tokens_used=15,
+            session_id="session-device-1",
         )
         assert msg.conversation_id == "conv-1"
         assert msg.user_id == "user-123"
+        assert msg.session_id == "session-device-1"
         assert msg.role == "user"
         assert msg.content == "你好"
         assert msg.tokens_used == 15

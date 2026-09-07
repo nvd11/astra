@@ -6,7 +6,7 @@
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,6 +47,10 @@ async def create_conversation(
     current_user: Annotated[User, Depends(get_current_user)],
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    session_id: Annotated[
+        str | None,
+        Header(alias="X-Session-ID", description="可选设备会话ID"),
+    ] = None,
 ) -> ConversationResponse:
     """创建新会话端点."""
     repo = ConversationRepository(db)
@@ -66,6 +70,7 @@ async def create_conversation(
 
     conversation = await repo.create(
         user_id=current_user.id,
+        session_id=session_id,
         title=title,
         model=model,
         agent_preference=agent,
@@ -81,6 +86,7 @@ async def create_conversation(
         message="success",
         data=ConversationData(
             id=conversation.id,
+            session_id=conversation.session_id,
             title=conversation.title,
             model=conversation.model,
             agent_preference=conversation.agent_preference,
@@ -124,6 +130,7 @@ async def list_conversations(
         conversation_items.append(
             ConversationData(
                 id=conv.id,
+                session_id=conv.session_id,
                 title=conv.title,
                 model=conv.model,
                 agent_preference=conv.agent_preference,
@@ -179,6 +186,7 @@ async def get_conversation(
         message="success",
         data=ConversationData(
             id=conversation.id,
+            session_id=conversation.session_id,
             title=conversation.title,
             model=conversation.model,
             agent_preference=conversation.agent_preference,
@@ -225,6 +233,7 @@ async def update_conversation(
         message="success",
         data=ConversationData(
             id=updated.id,
+            session_id=updated.session_id,
             title=updated.title,
             model=updated.model,
             agent_preference=updated.agent_preference,
@@ -314,6 +323,7 @@ async def list_messages(
         MessageData(
             id=m.id,
             conversation_id=m.conversation_id,
+            session_id=m.session_id,
             role=m.role,
             content=m.content,
             metadata=m.message_metadata,
@@ -386,6 +396,7 @@ async def edit_message(
         data=MessageData(
             id=updated_msg.id,
             conversation_id=updated_msg.conversation_id,
+            session_id=updated_msg.session_id,
             role=updated_msg.role,
             content=updated_msg.content,
             metadata=updated_msg.message_metadata,
