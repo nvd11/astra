@@ -15,7 +15,9 @@ from src.engine.redis_client import RedisClient, get_redis_client
 class ShortTermMemory:
     """基于 Redis 的短期多轮对话上下文缓存."""
 
-    def __init__(self, redis_client: RedisClient | None = None, default_ttl: int = 1800) -> None:
+    def __init__(
+        self, redis_client: RedisClient | None = None, default_ttl: int = 1800
+    ) -> None:
         """初始化短期记忆缓存.
 
         Args:
@@ -53,7 +55,9 @@ class ShortTermMemory:
                 return None
 
             messages: list[dict[str, str]] = json.loads(raw_data)
-            logger.debug(f"L1 Cache hit for conv={conversation_id}, msgs_len={len(messages)}")
+            logger.debug(
+                f"L1 Cache hit for conv={conversation_id}, msgs_len={len(messages)}"
+            )
             return messages
         except Exception as err:
             logger.warning(f"L1 Cache read error (fail-open to MySQL): {err}")
@@ -81,7 +85,9 @@ class ShortTermMemory:
             client = self._get_client()
             payload = json.dumps(messages, ensure_ascii=False)
             await client.setex(key, expire_seconds, payload)
-            logger.debug(f"L1 Cache saved for conv={conversation_id}, ttl={expire_seconds}s")
+            logger.debug(
+                f"L1 Cache saved for conv={conversation_id}, ttl={expire_seconds}s"
+            )
             return True
         except Exception as err:
             logger.warning(f"L1 Cache write error: {err}")

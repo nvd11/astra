@@ -116,6 +116,7 @@ class TestGetShortTermMemory:
     def test_singleton(self):
         """测试单例获取."""
         import src.memory.short_term as m
+
         m._short_term_memory = None
 
         m1 = get_short_term_memory()

@@ -273,7 +273,9 @@ class TestLiveAPIE2E:
 
         full_turn2_reply = "".join(turn2_chunks)
         # 1. 验证大模型凭借历史记忆成功复现出该专有名词！
-        assert secret_keyword in full_turn2_reply, f"Model failed to recall secret code {secret_keyword}"
+        assert (
+            secret_keyword in full_turn2_reply
+        ), f"Model failed to recall secret code {secret_keyword}"
 
         # 2. 直连 MySQL 验证该会话下的所有问答消息是否全部完整落库
         async with db_conn.cursor() as cur:
