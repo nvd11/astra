@@ -39,13 +39,26 @@ Astra 前端采用全端流体响应式架构，严格对标 DeepSeek Web 沉浸
 
 ### 1.3 流式打字机视觉输出与平滑缓冲渲染机制 (Smooth Typewriter Engine)
 
-1. **RAF 动态平滑缓冲算法 (`useTypewriter.ts`)**：
-   - 维持字符级 FIFO 缓冲队列，通过浏览器的 `requestAnimationFrame`（16.6ms）驱动匀速渲染循环；
-   - 根据队列堆积长度自适应调节单帧字符步长（1~6 字符/帧），高吞吐时不卡顿、低速率时不突兀；
-   - 保持 60 FPS 稳定帧率，将重绘导致的 CPU 占用降低 80% 以上。
-2. **呼吸光标与智能吸底跟随 (`useAutoScroll.ts`)**：
-   - 正在生成的文本末尾显示呼吸脉冲光标（`animate-pulse`），接收到 `[DONE]` 标记后平滑淡出；
-   - 自动吸底追踪与脱钩模式：用户向上翻阅时自动暂停滚动并显示“回到最新”悬浮提示按钮，杜绝视口强行拉扯。
+1. **原生 Fetch SSE 流式消费与协议帧解析 (`chatService.streamChat`)**：
+   - 采用标准 `fetch` API 结合 `ReadableStream` 与 `TextDecoder`，原生消费后端 SSE 数据流；
+   - 全局自动附加当前设备专属 `X-Session-ID` 请求头（配合后端实现全链路金融级设备审计追踪）；
+   - 严格组装请求载荷：`conversation_id`、`content`、以及胶囊动态选中的 `model_override`、`agent_override`；
+   - 逐行解析 `data: {...}` 协议包，提取 Token 增量 `delta`、完成标识 `finish_reason` 与当前 Agent 标签；
+   - 集成 `AbortController`，支持用户点击停止时本地瞬间切断网络流，并联动调用 `POST /astra/api/chat/stop` 向后端发送分布式中断信号。
+2. **会话无感自建与生命周期管理 (`chatStore.sendMessage`)**：
+   - **冷启动会话自动建档**：若当前处于“新对话”空白状态（`activeConversationId === null`），发送前自动异步调用 `POST /astra/api/conversations` 创建实体（以前 20 字符作为标题），无缝更新激活 ID；
+   - 用户消息与 Assistant 占位消息即时进入本地 Store，UI 零延迟响应用户输入。
+3. **RAF 动态平滑缓冲算法 (`useTypewriter.ts`)**：
+   - 维持字符级 FIFO 缓冲队列，由浏览器的 `requestAnimationFrame`（16.6ms 刷新率）驱动匀速渲染循环；
+   - **自适应出字步长（Dynamic Catch-up Step）**：
+     - 队列积压字符 `< 20` 时：单帧消费 1~2 个字符，维持优雅平滑的打字节奏；
+     - 队列积压字符 `> 50` 时：自动加速至 3~6 个字符/帧，迅速追赶进度，杜绝流式已结束界面仍在漫长打字的滞后感；
+   - 保持 60 FPS 稳定帧率，将组件高频重绘的 CPU 占用降低 80% 以上。
+4. **呼吸光标与智能吸底跟随 (`useAutoScroll.ts`)**：
+   - 正在生成的文本末尾显示呼吸脉冲光标（`inline-block w-2 h-4 bg-sky-500 animate-pulse`），接收到 `[DONE]` 标记后平滑淡出；
+   - **智能视口吸底与脱钩控制**：
+     - 默认自动跟随最新打出的字符平滑向底滚动；
+     - 检测到用户向上滚动或触摸翻阅历史消息时，立即解除强制吸底，右下角浮现优雅的 `[ ↓ 回到最新内容 ]` 悬浮回跳按钮，绝不强行拉扯视线。
 
 ### 1.4 多功能模块导航与 RAG 知识库扩展设计 (Extensible Navigation & RAG Hub)
 
