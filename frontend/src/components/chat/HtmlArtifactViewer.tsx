@@ -29,29 +29,85 @@ export const HtmlArtifactViewer: React.FC<HtmlArtifactViewerProps> = ({
   const { isStreaming } = useChatStore();
 
   // 组装注入 Tailwind 运行时与安全重置的沙箱文档
-  const generateSrcDoc = (rawCode: string): string => `
-    <!DOCTYPE html>
-    <html lang="zh-CN">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
-            margin: 0;
-            padding: 16px;
-            box-sizing: border-box;
-            background-color: transparent;
+  const generateSrcDoc = (rawCode: string): string => {
+    // 注入安全沙箱内存存储垫片，杜绝模型脚本调用 localStorage 时抛出 SecurityError 导致按钮事件崩溃
+    const shimScript = `
+      <script>
+        (function() {
+          function createSafeStorage() {
+            var memoryStore = {};
+            return {
+              getItem: function(k) { return Object.prototype.hasOwnProperty.call(memoryStore, k) ? memoryStore[k] : null; },
+              setItem: function(k, v) { memoryStore[k] = String(v); },
+              removeItem: function(k) { delete memoryStore[k]; },
+              clear: function() { memoryStore = {}; },
+              key: function(i) { return Object.keys(memoryStore)[i] || null; },
+              get length() { return Object.keys(memoryStore).length; }
+            };
           }
-          * { box-sizing: border-box; }
-        </style>
-      </head>
-      <body>
-        ${rawCode}
-      </body>
-    </html>
-  `;
+          try {
+            var test = window.localStorage;
+            if (!test) throw new Error();
+          } catch (err) {
+            try {
+              var safeStorage = createSafeStorage();
+              Object.defineProperty(window, 'localStorage', {
+                value: safeStorage,
+                configurable: true,
+                enumerable: true
+              });
+              Object.defineProperty(window, 'sessionStorage', {
+                value: createSafeStorage(),
+                configurable: true,
+                enumerable: true
+              });
+            } catch (e) {}
+          }
+        })();
+      </script>
+    `;
+
+    // 如果模型生成了完整的 HTML 页面，把 shim 与 Tailwind 注入到 <head> 或最顶部
+    if (
+      rawCode.includes('<html') ||
+      rawCode.includes('<!DOCTYPE') ||
+      rawCode.includes('<head>')
+    ) {
+      if (rawCode.includes('<head>')) {
+        return rawCode.replace(
+          '<head>',
+          `<head>${shimScript}<script src="https://cdn.tailwindcss.com"></script>`
+        );
+      }
+      return `${shimScript}<script src="https://cdn.tailwindcss.com"></script>${rawCode}`;
+    }
+
+    // 否则作为片段包裹完整 HTML 骨架
+    return `
+      <!DOCTYPE html>
+      <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          ${shimScript}
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+              margin: 0;
+              padding: 16px;
+              box-sizing: border-box;
+              background-color: transparent;
+            }
+            * { box-sizing: border-box; }
+          </style>
+        </head>
+        <body>
+          ${rawCode}
+        </body>
+      </html>
+    `;
+  };
 
   const handleCopy = async () => {
     try {
