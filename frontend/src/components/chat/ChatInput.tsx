@@ -1,13 +1,13 @@
 import React, { useRef, useEffect } from 'react';
 import {
   ArrowUp,
-  Sparkles,
-  ChevronDown,
   Square,
   Paperclip,
 } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
-import { AVAILABLE_AGENTS, AVAILABLE_MODELS, AgentType } from '@/types';
+import { AVAILABLE_AGENTS, AVAILABLE_MODELS } from '@/types';
+import { AgentSelector } from './AgentSelector';
+import { ModelSelector } from './ModelSelector';
 
 interface ChatInputProps {
   onSendMessage?: (content: string) => void;
@@ -18,9 +18,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
     inputPrompt,
     setInputPrompt,
     currentModel,
-    setCurrentModel,
     currentAgent,
-    setCurrentAgent,
     isStreaming,
     setIsStreaming,
   } = useChatStore();
@@ -67,38 +65,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
       <div className="relative rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 shadow-md hover:shadow-lg dark:shadow-2xl transition-all focus-within:border-zinc-400 dark:focus-within:border-zinc-600">
         {/* 上方胶囊选择器工具条 (水平防溢出横滑) */}
         <div className="px-3 pt-2.5 pb-1 flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-zinc-100 dark:border-zinc-800/50">
-          {/* Agent 选择器 */}
-          <div className="relative group">
-            <select
-              value={currentAgent}
-              onChange={(e) => setCurrentAgent(e.target.value as AgentType)}
-              className="appearance-none pl-6 pr-7 py-1 text-xs font-medium rounded-full bg-zinc-100/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/80 dark:hover:bg-zinc-700 cursor-pointer border border-zinc-200/70 dark:border-transparent transition-all outline-none shadow-2xs"
-            >
-              {AVAILABLE_AGENTS.map((agent) => (
-                <option key={agent.id} value={agent.id} className="bg-white dark:bg-zinc-900">
-                  {agent.name}
-                </option>
-              ))}
-            </select>
-            <Sparkles className="w-3.5 h-3.5 text-sky-500 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <ChevronDown className="w-3 h-3 text-zinc-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          {/* Model 选择器 */}
-          <div className="relative group">
-            <select
-              value={currentModel}
-              onChange={(e) => setCurrentModel(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1 text-xs font-medium rounded-full bg-zinc-100/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/80 dark:hover:bg-zinc-700 cursor-pointer border border-zinc-200/70 dark:border-transparent transition-all outline-none shadow-2xs"
-            >
-              {AVAILABLE_MODELS.map((model) => (
-                <option key={model.id} value={model.id} className="bg-white dark:bg-zinc-900">
-                  {model.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3 h-3 text-zinc-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <AgentSelector />
+          <ModelSelector />
         </div>
 
         {/* 核心多行输入区域 */}
