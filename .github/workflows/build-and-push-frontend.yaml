@@ -1,23 +1,19 @@
-name: Build and Push Astra Backend Image
+name: Build and Push Astra Frontend Image
 
 on:
   push:
     branches:
       - main
-    paths-ignore:
+    paths:
       - "frontend/**"
-      - "docs/**"
-      - "blogs/**"
-      - "*.md"
-      - ".gitignore"
-      - ".vscode/**"
+      - ".github/workflows/build-and-push-frontend.yaml"
     tags:
       - "v*"
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: nvd11/astra-backend
+  IMAGE_NAME: nvd11/astra-frontend
 
 jobs:
   build-and-push:
@@ -57,8 +53,8 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          context: backend
-          file: backend/Dockerfile
+          context: frontend
+          file: frontend/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -107,7 +103,7 @@ jobs:
             --header "X-GitHub-Api-Version: 2022-11-28" \
             --data "$(jq -n \
               --arg digest "$IMAGE_DIGEST" \
-              '{event_type:"update-app-image-digest",client_payload:{svc_name:"astra-backend",image_digest:$digest}}')")"
+              '{event_type:"update-app-image-digest",client_payload:{svc_name:"astra-frontend",image_digest:$digest}}')")"
 
           echo "GitOps dispatch HTTP status: $http_status"
           echo "GitOps digest: $IMAGE_DIGEST"
