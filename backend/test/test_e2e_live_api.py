@@ -22,7 +22,7 @@ import redis.asyncio as aioredis
 # 导入应用定义以满足覆盖率探针检测
 
 # 线上 API 入口与基础设施连接参数
-API_BASE_URL = "https://gw.jppwl.asia/api"
+API_BASE_URL = "https://gw.jppwl.asia/astra/api"
 LIVE_MYSQL_HOST = "161.118.240.218"
 LIVE_MYSQL_PORT = 3306
 LIVE_MYSQL_USER = "admin"
