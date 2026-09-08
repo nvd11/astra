@@ -1,7 +1,7 @@
 # ==========================================
-# 阶段 1: 静态编译构建环境
+# 阶段 1: 静态编译构建环境 (以原生架构执行，避免 QEMU 模拟性能损耗)
 # ==========================================
-FROM node:22-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 WORKDIR /app
 
