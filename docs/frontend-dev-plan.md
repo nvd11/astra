@@ -58,6 +58,17 @@ Astra 前端采用全端流体响应式架构，严格对标 DeepSeek Web 沉浸
 3. **对话流中的知识库即时挂载 (`KnowledgeSelector.tsx`)**：
    - 输入框上方工具栏支持按需挂载已启用的知识库，提问时自动注入上下文实现 RAG 问答。
 
+### 1.5 智能体与模型胶囊选择器双向数据绑定规范 (Capsule Selectors & Data Binding Specification)
+
+1. **四层数据联动模型**：
+   - **会话级同步**：点击侧边栏会话切换时，胶囊选择器必须自动与当前 `conversation.model` 与 `conversation.agent_preference` 双向回显；
+   - **即时变更持久化**：用户在活跃会话中切换胶囊选项时，即时触发 `PUT /astra/api/conversations/{id}` 接口保存最新配置，持久化落库；
+   - **新会话默认值继承**：点击“+ 新对话”创建会话时，选择器自动继承用户设置中心保存的默认值（`user.default_model`、`user.default_agent`）；
+   - **发送参数透传**：提问时将选中的模型与智能体以 `model_override` 与 `agent_override` 注入 SSE 请求体。
+2. **DeepSeek 原生交互级自定义悬浮浮层 (`AgentSelector.tsx` / `ModelSelector.tsx`)**：
+   - 彻底废弃系统原生 `<select>` 标签，改用具有毛玻璃质感的高颜值自定义 Popover 浮层；
+   - 选项呈现彩色品牌图标、提供商徽章与场景描述，选中项附带高亮与对勾标记，点击外部空白处平滑收起。
+
 ---
 
 ## 2. 目录结构总览

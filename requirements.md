@@ -107,26 +107,30 @@
 | `claude-sonnet-4-6` | Anthropic | 长文本强，逻辑严谨 | 文档写作、深度分析 |
 | `qwen-max` | 阿里 | 中文优化，知识丰富 | 中文创作、知识问答 |
 
-**选择器 UI 设计：**
-- 位置：输入框上方工具栏，两个下拉选择器并排
-- 默认值：Agent = 自动路由，LLM = 用户上次选择或系统默认
-- 持久化：选择存入 `conversations.model` 和 `conversations.agent_preference`
-- 切换时机：新会话生效，或手动切换后下一条消息生效
+**选择器 UI 与全链路双向数据绑定设计：**
+
+1. **四层数据双向绑定机制 (Four-Layer Two-Way Binding)**：
+   - **会话级回显与绑定**：用户在侧边栏切换不同历史会话时，选择器自动从当前选中会话实体读取 `conversation.model` 与 `conversation.agent_preference` 进行动态回显；
+   - **即时修改与持久化同步**：用户在当前会话中主动切换模型或智能体时，前端状态立刻响应，并自动调用 `PUT /conversations/{id}` 将最新选择实时持久化到后端 MySQL，刷新页面不丢失；
+   - **全局偏好自动继承**：当点击“+ 新对话”开启全新空白对话时，选择器自动从用户个人资料 (`user.default_model`, `user.default_agent`) 中继承默认值，无需反复挑选；
+   - **动态占位符联动与发送透传**：输入框占位提示语实时根据选择器动态联动：`向 [所选Agent] 提问，基于 [所选Model]... (Shift+Enter 换行)`；发送消息时，值自动组装进 `SendMessageRequest` 的 `model_override` 与 `agent_override` 字段中。
+
+2. **高颜值悬浮浮层菜单交互 (Custom Popover Dropdown)**：
+   - **摒弃系统原生 Select**：彻底废弃浏览器原生白框 `<select>`，改用具有 DeepSeek 质感的半透明微毛玻璃卡片（Popover）；
+   - **信息多维呈现**：每个选项不仅展示名称，还清晰展示品牌彩色图标、提供商徽标标签（如 Google / DeepSeek / Anthropic）与适用场景说明；
+   - **当前选中态**：当前选中项以柔和主色高亮并附带右侧对勾（`Check`）图标，支持点击外部区域自动平滑收起。
 
 **后端处理逻辑：**
-```python
-# 请求体示例
+```json
+// 请求体示例
 {
-  "message": "帮我写个 Python 脚本",
+  "content": "帮我写个 Python 脚本",
   "conversation_id": "uuid",
-  "agent_override": "code_agent",      # 可选，强制指定 Agent
-  "model_override": "deepseek-v4-flash" # 可选，强制指定模型
+  "agent_override": "code_assistant",      // 可选，强制指定 Agent
+  "model_override": "deepseek-v4-flash",    // 可选，强制指定模型
+  "stream": true
 }
-
-# Main Agent 路由逻辑
-if request.agent_override:
-    agent = get_agent(request.agent_override)  # 强制指定
-else:
+```
     agent = main_agent.route(request.message)  # 自动路由
 
 # LLM 调用
