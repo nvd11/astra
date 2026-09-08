@@ -491,6 +491,7 @@ backend/
 | `LiteLLMClient.__init__` | `def __init__(self, base_url: str, api_key: str, default_model: str) -> None` | 初始化 HTTPX 异步客户端 |
 | `LiteLLMClient.acompletion` | `async def acompletion(self, model: str, messages: list[dict[str, Any]], temperature: float = 0.7, max_tokens: int | None = None) -> dict[str, Any]` | 非流式文本推理 |
 | `LiteLLMClient.astream_completion` | `async def astream_completion(self, model: str, messages: list[dict[str, Any]], temperature: float = 0.7) -> AsyncIterator[str]` | 异步逐字输出 Delta 字符流 |
+| `LiteLLMClient.get_models` | `async def get_models(self) -> list[dict[str, Any]]` | 动态查询 LiteLLM 网关真实挂载的可用模型列表 |
 | `LiteLLMClient.aembedding` | `async def aembedding(self, text: str, model: str = "text-embedding-3-small") -> list[float]` | 生成 1536 维浮点向量 |
 
 ---
@@ -715,8 +716,9 @@ Service 层承载纯粹的领域逻辑，屏蔽底层 ORM 细节，与 Router �
 ### 9.3 `src/routers/chat.py`
 - **文件路径**：`src/routers/chat.py`
 - **端点**：
-  - `POST /chat/completions` -> 返回 `StreamingResponse(media_type="text/event-stream")`（核心 SSE 流式对话，实时打字机推流）
+  - `POST /chat/stream` -> 返回 `StreamingResponse(media_type="text/event-stream")`（核心 SSE 流式对话，实时打字机推流）
   - `POST /chat/stop` -> `BaseResponse[dict]`（手动中止当前正在运行的流式推理）
+  - `GET /chat/models` -> `BaseResponse[list[ModelItemData]]`（全动态代理发现 LiteLLM 网关真实挂载的可用模型，带 Redis 300s 缓存防雪崩与提供商标签解析）
 
 ### 9.4 `src/routers/conversations.py`
 - **文件路径**：`src/routers/conversations.py`

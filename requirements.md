@@ -96,16 +96,20 @@
 | **创意写作** | 强制路由至 `creative_agent` | 文案、头脑风暴 |
 | **通用对话** | 强制路由至 `general_agent` | 闲聊、简单问答 |
 
-**LLM 模型选择器（可选切换）：**
+**LLM 模型动态发现机制 (全动态网关同步，严禁 Hardcode)：**
 
-用户可为当前会话或全局默认选择底层模型：
+模型列表**严禁在前端代码中静态硬编码**，必须通过私有网关实时自动发现与动态装配：
 
-| 模型 | 提供方 | 特点 | 适用场景 |
-|------|--------|------|----------|
-| `deepseek-v4-flash` | DeepSeek | 速度快，成本低 | 日常对话、代码生成 |
-| `gemini-3.8-flash` | Google | 多模态强，推理好 | 图文理解、复杂分析 |
-| `claude-sonnet-4-6` | Anthropic | 长文本强，逻辑严谨 | 文档写作、深度分析 |
-| `qwen-max` | 阿里 | 中文优化，知识丰富 | 中文创作、知识问答 |
+1. **后端统一发现中继 (`GET /astra/api/chat/models`)**：
+   - 后端 `LiteLLMClient` 使用 Virtual Key 调用私有网关接口 `GET {LITELLM_BASE_URL}/models`，杜绝密钥泄漏至浏览器；
+   - 引入 Redis L1 缓存机制（缓存键 `cache:litellm:models`，TTL 300s），防止高并发穿透网关；
+   - 自动解析模型名称前缀，智能映射提供商徽章（如 `gemini-*` ➔ Google，`kimi-*` ➔ Moonshot，`gpt-*` ➔ OpenAI，`claude-*` ➔ Anthropic）；
+   - 根据应用配置 `APP_DEFAULT_MODEL` 自动注入 `is_default` 标记。
+
+2. **前端响应式消费与动态呈现**：
+   - 前端 Store (`chatStore.ts`) 异步触发 `fetchModels()`；
+   - 模型选择胶囊实时基于网关在线清单动态渲染，自动适配 LiteLLM 挂载的实际模型（如 `gemini-3.8-flash`, `gemini-3.7-flash`, `kimi-k3`, `gpt-5.6-luna-a6` 等）；
+   - 当运维在 LiteLLM 侧热上线或下架模型时，前端零改动、零构建，自动实时同步。
 
 **选择器 UI 与全链路双向数据绑定设计：**
 
@@ -117,7 +121,7 @@
 
 2. **高颜值悬浮浮层菜单交互 (Custom Popover Dropdown)**：
    - **摒弃系统原生 Select**：彻底废弃浏览器原生白框 `<select>`，改用具有 DeepSeek 质感的半透明微毛玻璃卡片（Popover）；
-   - **信息多维呈现**：每个选项不仅展示名称，还清晰展示品牌彩色图标、提供商徽标标签（如 Google / DeepSeek / Anthropic）与适用场景说明；
+   - **信息多维呈现**：每个选项不仅展示名称，还清晰展示品牌彩色图标、提供商徽标标签（如 Google / Moonshot / OpenAI）与适用场景说明；
    - **当前选中态**：当前选中项以柔和主色高亮并附带右侧对勾（`Check`）图标，支持点击外部区域自动平滑收起。
 
 **后端处理逻辑：**
@@ -127,15 +131,9 @@
   "content": "帮我写个 Python 脚本",
   "conversation_id": "uuid",
   "agent_override": "code_assistant",      // 可选，强制指定 Agent
-  "model_override": "deepseek-v4-flash",    // 可选，强制指定模型
+  "model_override": "gemini-3.8-flash",    // 可选，强制指定模型 (动态匹配网关)
   "stream": true
 }
-```
-    agent = main_agent.route(request.message)  # 自动路由
-
-# LLM 调用
-model = request.model_override or conversation.model or user.default_model
-response = await litellm.acompletion(model=model, messages=messages)
 ```
 
 ---

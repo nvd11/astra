@@ -68,6 +68,11 @@ Astra 前端采用全端流体响应式架构，严格对标 DeepSeek Web 沉浸
 2. **DeepSeek 原生交互级自定义悬浮浮层 (`AgentSelector.tsx` / `ModelSelector.tsx`)**：
    - 彻底废弃系统原生 `<select>` 标签，改用具有毛玻璃质感的高颜值自定义 Popover 浮层；
    - 选项呈现彩色品牌图标、提供商徽章与场景描述，选中项附带高亮与对勾标记，点击外部空白处平滑收起。
+3. **全动态模型发现与零 Hardcode 原则 (Dynamic Gateway Discovery)**：
+   - **严禁前端代码硬编码模型静态列表**；
+   - 页面启动时由 `useChatStore` 异步触发 `fetchModels()`，调用 `GET /astra/api/chat/models` 接口实时获取 LiteLLM 网关当前挂载的真实模型清单；
+   - 动态识别模型前缀并自动挂载对应提供商标签（Google, Moonshot, OpenAI 等），根据后端 `is_default` 自动激活默认模型；
+   - LiteLLM 网关热增删模型时，前端零改动、零构建，自动实时生效。
 
 ---
 
