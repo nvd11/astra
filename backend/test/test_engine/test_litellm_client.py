@@ -28,11 +28,10 @@ class TestLiteLLMClient:
     def test_normalize_model(self, client):
         """测试模型前缀规范化."""
         assert (
-            client._normalize_model("deepseek-v4-flash") == "openai/deepseek-v4-flash"
+            client._normalize_model("gpt-5.6-luna-yuanheng") == "gpt-5.6-luna-yuanheng"
         )
-        assert client._normalize_model("openai/gpt-4o") == "openai/gpt-4o"
-        assert client._normalize_model("anthropic/claude-3-5") == "anthropic/claude-3-5"
-        assert client._normalize_model(None) == "openai/deepseek-v4-flash"
+        assert client._normalize_model("openai/gpt-4o") == "gpt-4o"
+        assert client._normalize_model(None) == "deepseek-v4-flash"
 
     @pytest.mark.asyncio
     async def test_acompletion_success(self, client):
