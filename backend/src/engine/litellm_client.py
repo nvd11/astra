@@ -34,6 +34,8 @@ class LiteLLMClient:
 
         # 禁用 LiteLLM 的 telemetry 收集以保护金融环境数据合规
         litellm.telemetry = False
+        # 自动丢弃推理模型 (如 o1/o3/luna-yuanheng) 不支持的特定参数 (如 temperature)
+        litellm.drop_params = True
 
         logger.info(
             f"LiteLLM client initialized with gateway={self.base_url}, default_model={self.default_model}"
