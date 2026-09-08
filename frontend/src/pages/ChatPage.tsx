@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { Sparkles, User as UserIcon, ArrowDown, Cpu } from 'lucide-react';
 import { EmptyState } from '@/components/chat/EmptyState';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { useChatStore } from '@/stores/chatStore';
 import { useTypewriter } from '@/hooks/useTypewriter';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
@@ -197,14 +198,17 @@ export const ChatPage: React.FC = () => {
                           : 'bg-white text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 rounded-bl-sm border border-zinc-200/80 dark:border-zinc-800 shadow-xs'
                       }`}
                     >
-                      {/* 正文或实时打字机内容 */}
-                      <p className="whitespace-pre-wrap break-words">
-                        {contentToDisplay}
-                        {/* 呼吸脉冲打字光标 */}
-                        {isCurrentStreamingMsg && typewriter.isTyping && (
-                          <span className="inline-block w-1.5 h-4 ml-1 bg-sky-500 rounded-xs animate-pulse align-middle" />
-                        )}
-                      </p>
+                      {msg.role === 'user' ? (
+                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                      ) : (
+                        <div>
+                          <MarkdownRenderer content={contentToDisplay} />
+                          {/* 呼吸脉冲打字光标 */}
+                          {isCurrentStreamingMsg && typewriter.isTyping && (
+                            <span className="inline-block w-1.5 h-4 ml-1 bg-sky-500 rounded-xs animate-pulse align-middle" />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
