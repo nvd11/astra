@@ -32,7 +32,11 @@ class TestConversationRepository:
 
     @pytest.mark.asyncio
     async def test_create_conversation(self, repo, mock_session):
-        """测试创建会话."""
+        """测试创建会话 - 合法已登记 session_id."""
+        mock_res = MagicMock()
+        mock_res.scalar_one_or_none.return_value = "session-device-1"
+        mock_session.execute.return_value = mock_res
+
         conv = await repo.create(
             user_id="user-123",
             title="测试对话",
@@ -50,6 +54,24 @@ class TestConversationRepository:
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
         mock_session.refresh.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_conversation_unregistered_session_fallback(
+        self, repo, mock_session
+    ):
+        """测试创建会话 - 未在 user_sessions 登记的非法 session_id 优雅降级为 NULL."""
+        mock_res = MagicMock()
+        mock_res.scalar_one_or_none.return_value = None  # 库中不存在
+        mock_session.execute.return_value = mock_res
+
+        conv = await repo.create(
+            user_id="user-123",
+            title="未登录设备创建对话",
+            session_id="unregistered-random-uuid",
+        )
+        assert conv.user_id == "user-123"
+        assert conv.session_id is None  # 优雅降级为 NULL，避免外键约束报错
+        mock_session.add.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_by_id_success(self, repo, mock_session):
@@ -178,6 +200,26 @@ class TestMessageRepository:
         assert msg.message_metadata == {"step": 1}
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_message_unregistered_session_fallback(
+        self, repo, mock_session
+    ):
+        """测试创建消息 - 未在 user_sessions 登记的非法 session_id 优雅降级为 NULL."""
+        mock_res = MagicMock()
+        mock_res.scalar_one_or_none.return_value = None
+        mock_session.execute.return_value = mock_res
+
+        msg = await repo.create(
+            conversation_id="conv-1",
+            user_id="user-123",
+            role="user",
+            content="你好",
+            session_id="unregistered-random-uuid",
+        )
+        assert msg.user_id == "user-123"
+        assert msg.session_id is None  # 优雅降级为 NULL
+        mock_session.add.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_by_id(self, repo, mock_session):

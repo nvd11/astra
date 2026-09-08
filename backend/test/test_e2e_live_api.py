@@ -505,3 +505,64 @@ class TestLiveAPIE2E:
             assert db_conv_title == "设备审计溯源会话"
             assert content == audit_prompt
             assert role == "user"
+
+    # ========================================================
+    # 场景 9: 未登记 Session ID 异常容错测试 (防外键 1452 导致 500/404)
+    # ========================================================
+    async def test_09_unregistered_session_id_graceful_fallback(
+        self,
+        http_client: httpx.AsyncClient,
+        db_conn: asyncmy.Connection,
+    ):
+        """测试 9: 传入库中未注册的脏 X-Session-ID，验证后端外键优雅降级为 NULL，不崩不报 500."""
+        unregistered_uuid = str(uuid.uuid4())
+
+        # 1. 确认该 UUID 绝对不存在于 user_sessions 表中
+        async with db_conn.cursor() as cur:
+            await cur.execute(
+                "SELECT COUNT(*) FROM user_sessions WHERE id = %s;",
+                (unregistered_uuid,),
+            )
+            count = (await cur.fetchone())[0]
+            assert count == 0
+
+        # 2. 携带未登记的 Session ID 创建会话 (验证绝不触发 1452 外键 500 报错)
+        conv_resp = await http_client.post(
+            "/conversations",
+            headers={"X-Session-ID": unregistered_uuid},
+            json={"title": "未登记 Session 容错测试会话"},
+        )
+        assert conv_resp.status_code == 201
+        conv_data = conv_resp.json()["data"]
+        conv_id = conv_data["id"]
+
+        # 3. 携带未登记的 Session ID 发送流式对话 (验证正常推流，绝不报 500 或 404)
+        async with http_client.stream(
+            "POST",
+            "/chat/stream",
+            headers={"X-Session-ID": unregistered_uuid},
+            json={"conversation_id": conv_id, "content": "ping test fallback"},
+        ) as stream_resp:
+            assert stream_resp.status_code == 200
+            async for _ in stream_resp.aiter_lines():
+                pass
+
+        await asyncio.sleep(1)
+
+        # 4. 直连 MySQL 核实：conversations 和 messages 的 session_id 均优雅回退为 NULL
+        async with db_conn.cursor() as cur:
+            await cur.execute(
+                "SELECT session_id FROM conversations WHERE id = %s;",
+                (conv_id,),
+            )
+            conv_session_id = (await cur.fetchone())[0]
+            assert conv_session_id is None
+
+            await cur.execute(
+                "SELECT session_id FROM messages WHERE conversation_id = %s;",
+                (conv_id,),
+            )
+            rows = await cur.fetchall()
+            assert len(rows) > 0
+            for row in rows:
+                assert row[0] is None
