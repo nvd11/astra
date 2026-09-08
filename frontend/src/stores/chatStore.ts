@@ -71,17 +71,51 @@ export const useChatStore = create<ChatStore>((set) => ({
   isMobileDrawerOpen: false,
 
   setConversations: (conversations) => set({ conversations }),
-  setActiveConversationId: (id) => set({ activeConversationId: id }),
+  setActiveConversationId: (id) =>
+    set((state) => {
+      if (!id) {
+        return { activeConversationId: null };
+      }
+      const conv = state.conversations.find((c) => c.id === id);
+      if (conv) {
+        return {
+          activeConversationId: id,
+          currentModel: conv.model || state.currentModel,
+          currentAgent: (conv.agent_preference as AgentType) || state.currentAgent,
+        };
+      }
+      return { activeConversationId: id };
+    }),
   setMessages: (messages) => set({ messages }),
-  addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-  setCurrentModel: (currentModel) => set({ currentModel }),
-  setCurrentAgent: (currentAgent) => set({ currentAgent }),
+  addMessage: (message) =>
+    set((state) => ({ messages: [...state.messages, message] })),
+  setCurrentModel: (model) =>
+    set((state) => ({
+      currentModel: model,
+      conversations: state.activeConversationId
+        ? state.conversations.map((c) =>
+            c.id === state.activeConversationId ? { ...c, model } : c
+          )
+        : state.conversations,
+    })),
+  setCurrentAgent: (agent) =>
+    set((state) => ({
+      currentAgent: agent,
+      conversations: state.activeConversationId
+        ? state.conversations.map((c) =>
+            c.id === state.activeConversationId
+              ? { ...c, agent_preference: agent }
+              : c
+          )
+        : state.conversations,
+    })),
   setInputPrompt: (inputPrompt) => set({ inputPrompt }),
   setIsStreaming: (isStreaming) => set({ isStreaming }),
 
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
-  toggleMobileDrawer: () => set((state) => ({ isMobileDrawerOpen: !state.isMobileDrawerOpen })),
+  toggleMobileDrawer: () =>
+    set((state) => ({ isMobileDrawerOpen: !state.isMobileDrawerOpen })),
   setMobileDrawerOpen: (isMobileDrawerOpen) => set({ isMobileDrawerOpen }),
 
   startNewChat: () =>
@@ -89,6 +123,8 @@ export const useChatStore = create<ChatStore>((set) => ({
       activeConversationId: null,
       messages: [],
       inputPrompt: '',
+      currentModel: 'deepseek-v4-flash',
+      currentAgent: 'auto',
       isMobileDrawerOpen: false,
     }),
 }));
