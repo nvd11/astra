@@ -16,8 +16,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.agents.graph import astream_chat
 from src.configs.config import Settings, get_settings
+from src.engine.litellm_client import get_litellm_client
 from src.engine.mysql_client import get_db_session, get_mysql_client
-from src.engine.redis_client import get_redis_client
+from src.engine.redis_client import RedisClient, get_redis_client
 from src.memory.short_term import get_short_term_memory
 from src.models.conversation import ConversationRepository, MessageRepository
 from src.models.requests import SendMessageRequest, StopChatRequest
@@ -238,3 +239,107 @@ async def stop_chat(
         message="Inference stop signal sent",
         data={"conversation_id": conv.id, "stopped": True},
     )
+
+
+def parse_model_metadata(model_id: str, default_model: str) -> dict[str, Any]:
+    """根据模型 ID 智能推断展示名称、提供商与特性描述."""
+    mid = model_id.lower()
+    provider = "Custom"
+    description = "通用大语言模型"
+    name = model_id
+
+    if "gemini" in mid:
+        provider = "Google"
+        if "3.8" in mid:
+            name = "Gemini 3.8 Flash"
+            description = "主力旗舰模型，超低延迟与多模态强推理"
+        elif "3.7" in mid:
+            name = "Gemini 3.7 Flash"
+            description = "极速轻量模型，日常对话与敏捷代码生成"
+        else:
+            name = f"Gemini ({model_id})"
+            description = "Google 多模态大模型"
+    elif "kimi" in mid:
+        provider = "Moonshot"
+        name = "Kimi K3" if "k3" in mid else f"Kimi ({model_id})"
+        description = "超长文本与复杂中文语境深度理解分析"
+    elif "gpt" in mid or "luna" in mid:
+        provider = "OpenAI"
+        if "yuanheng" in mid:
+            name = "GPT-5.6 Luna 元亨"
+            description = "深度思维链推导与复杂数学逻辑解析"
+        elif "a6" in mid:
+            name = "GPT-5.6 Luna A6"
+            description = "前沿高阶全能推理与系统架构设计"
+        else:
+            name = model_id
+            description = "OpenAI 兼容全能推理大模型"
+    elif "deepseek" in mid:
+        provider = "DeepSeek"
+        name = "DeepSeek V4 Flash" if "v4" in mid else model_id
+        description = "极速代码与深度推理"
+    elif "claude" in mid:
+        provider = "Anthropic"
+        name = "Claude Sonnet 4.6" if "4" in mid else model_id
+        description = "严谨逻辑分析与长文本架构"
+    elif "qwen" in mid:
+        provider = "Alibaba"
+        name = "Qwen Max"
+        description = "通义千问旗舰中文模型"
+
+    return {
+        "id": model_id,
+        "name": name,
+        "provider": provider,
+        "description": description,
+        "is_default": (model_id == default_model),
+    }
+
+
+@router.get(
+    "/models",
+    response_model=BaseResponse[list[dict[str, Any]]],
+    summary="动态获取可用模型列表",
+    description="从 LiteLLM 网关动态拉取当前真实配准的可用模型，带 Redis 300s 缓存与提供商智能解析",
+)
+async def list_models(
+    settings: Annotated[Settings, Depends(get_settings)],
+    redis_client: Annotated[RedisClient, Depends(get_redis_client)],
+) -> BaseResponse[list[dict[str, Any]]]:
+    """动态获取模型列表端点."""
+    cache_key = "cache:litellm:models"
+
+    # 1. 优先查 Redis 缓存
+    try:
+        cached = await redis_client.get(cache_key)
+        if cached:
+            models_list = json.loads(cached)
+            return BaseResponse(code=0, message="success", data=models_list)
+    except Exception as err:
+        logger.warning(f"Redis cache read error for models: {err}")
+
+    # 2. 未命中，实时向 LiteLLM 网关发起查询
+    client = get_litellm_client()
+    raw_models = await client.get_models()
+
+    # 若网关拉取成功，进行智能解析；若网关暂时异常，兜底返回配置中的默认模型
+    if raw_models:
+        parsed_models = [
+            parse_model_metadata(item.get("id", ""), settings.default_model)
+            for item in raw_models
+            if item.get("id")
+        ]
+    else:
+        parsed_models = [
+            parse_model_metadata(settings.default_model, settings.default_model)
+        ]
+
+    # 3. 回填 Redis 缓存 (300 秒)
+    try:
+        await redis_client.setex(
+            cache_key, 300, json.dumps(parsed_models, ensure_ascii=False)
+        )
+    except Exception as err:
+        logger.warning(f"Redis cache write error for models: {err}")
+
+    return BaseResponse(code=0, message="success", data=parsed_models)

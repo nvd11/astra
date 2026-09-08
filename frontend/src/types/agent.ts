@@ -38,38 +38,12 @@ export const AVAILABLE_AGENTS: AgentInfo[] = [
 ];
 
 /**
- * 支持的底层 LLM 模型列表
+ * 底层推理大模型元数据接口 (100% 由后端 /chat/models 动态下发，严禁前端硬编码)
  */
 export interface ModelInfo {
   id: string;
   name: string;
   provider: string;
   description: string;
+  is_default?: boolean;
 }
-
-export const AVAILABLE_MODELS: ModelInfo[] = [
-  {
-    id: 'deepseek-v4-flash',
-    name: 'DeepSeek V4 Flash',
-    provider: 'DeepSeek',
-    description: '极速代码与推理，日常高频首选',
-  },
-  {
-    id: 'gemini-3.8-flash',
-    name: 'Gemini 3.8 Flash',
-    provider: 'Google',
-    description: '低延迟、多模态超强推理',
-  },
-  {
-    id: 'claude-sonnet-4-6',
-    name: 'Claude Sonnet 4.6',
-    provider: 'Anthropic',
-    description: '长文本架构与严谨工程分析',
-  },
-  {
-    id: 'qwen-max',
-    name: 'Qwen Max',
-    provider: 'Alibaba',
-    description: '中文语境精深理解与创作',
-  },
-];

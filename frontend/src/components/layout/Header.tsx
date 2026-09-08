@@ -2,7 +2,6 @@ import React from 'react';
 import { Menu, PanelLeftClose, PanelLeft, Moon, Sun, Sparkles } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { AVAILABLE_MODELS } from '@/types';
 
 export const Header: React.FC = () => {
   const {
@@ -10,10 +9,14 @@ export const Header: React.FC = () => {
     toggleSidebar,
     toggleMobileDrawer,
     currentModel,
+    availableModels,
   } = useChatStore();
   const { theme, toggleTheme } = useThemeStore();
 
-  const modelInfo = AVAILABLE_MODELS.find((m) => m.id === currentModel) || AVAILABLE_MODELS[0];
+  const modelInfo =
+    availableModels.find((m) => m.id === currentModel) || {
+      name: currentModel,
+    };
 
   return (
     <header className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md px-4 flex items-center justify-between z-10 select-none">

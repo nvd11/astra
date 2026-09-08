@@ -201,3 +201,55 @@ class TestChatRouter:
                 "/chat/stop", json={"conversation_id": "nonexistent"}
             )
             assert response.status_code == 404
+
+    def test_list_models_cached(self, client: TestClient, app):
+        """测试获取模型列表 - Redis 缓存命中."""
+        import json
+
+        from src.engine.redis_client import get_redis_client
+
+        mock_redis = AsyncMock()
+        mock_redis.get.return_value = json.dumps(
+            [
+                {
+                    "id": "gemini-3.8-flash",
+                    "name": "Gemini 3.8 Flash",
+                    "provider": "Google",
+                }
+            ]
+        )
+        app.dependency_overrides[get_redis_client] = lambda: mock_redis
+
+        response = client.get("/chat/models")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["code"] == 0
+        assert len(data["data"]) == 1
+        assert data["data"][0]["name"] == "Gemini 3.8 Flash"
+
+    def test_list_models_from_gateway(self, client: TestClient, app):
+        """测试获取模型列表 - 穿透查询网关并写入缓存."""
+        from src.engine.redis_client import get_redis_client
+
+        mock_redis = AsyncMock()
+        mock_redis.get.return_value = None
+        mock_redis.setex = AsyncMock()
+        app.dependency_overrides[get_redis_client] = lambda: mock_redis
+
+        mock_litellm = AsyncMock()
+        mock_litellm.get_models.return_value = [
+            {"id": "gemini-3.8-flash"},
+            {"id": "kimi-k3"},
+            {"id": "gpt-5.6-luna-a6"},
+        ]
+
+        with patch("src.routers.chat.get_litellm_client", return_value=mock_litellm):
+            response = client.get("/chat/models")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["code"] == 0
+            assert len(data["data"]) == 3
+            assert data["data"][0]["provider"] == "Google"
+            assert data["data"][1]["provider"] == "Moonshot"
+            assert data["data"][2]["provider"] == "OpenAI"
+            mock_redis.setex.assert_called_once()
