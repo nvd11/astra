@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# 复制源码并编译生产包
+# 复制源码并编译生产包 (base: /astra/)
 COPY . .
 RUN npm run build
 
@@ -18,9 +18,10 @@ RUN npm run build
 # ==========================================
 FROM nginx:1.27-alpine AS runner
 
-# 移除默认配置并挂载自定义 SPA 配置文件
+# 移除默认配置并将构建产物放置于 /usr/share/nginx/html/astra
 RUN rm -rf /etc/nginx/conf.d/default.conf /usr/share/nginx/html/*
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/dist /usr/share/nginx/html/astra
+RUN ln -s /usr/share/nginx/html/astra/index.html /usr/share/nginx/html/index.html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
