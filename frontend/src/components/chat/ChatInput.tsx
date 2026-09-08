@@ -67,7 +67,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
     };
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 pb-4 select-none">
+    <div className="w-full max-w-4xl xl:max-w-5xl mx-auto px-4 pb-4 select-none">
       {/* 悬浮输入卡片 */}
       <div className="relative rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 shadow-md hover:shadow-lg dark:shadow-2xl transition-all focus-within:border-zinc-400 dark:focus-within:border-zinc-600">
         {/* 上方胶囊选择器工具条 (不可使用 overflow-x-auto，避免裁切向上弹出的悬浮菜单) */}
