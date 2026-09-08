@@ -19,6 +19,43 @@ AGENT_PROMPTS: dict[str, str] = {
     "deep_reasoner": "You are a deep-thinking AI assistant. Analyze problems methodically, verifying edge cases and thinking step-by-step.",
 }
 
+# 智能体中心注册表 (作为全系统唯一信任源 SSOT，供动态 API 与前端消费)
+AGENT_REGISTRY: list[dict[str, Any]] = [
+    {
+        "id": "auto",
+        "name": "自动路由",
+        "description": "Main Agent 根据提问智能意图分发",
+        "icon": "Sparkles",
+        "is_default": True,
+    },
+    {
+        "id": "code_assistant",
+        "name": "代码助手",
+        "description": "深度工程架构与 Clean Code 专家",
+        "icon": "Code2",
+        "is_default": False,
+    },
+    {
+        "id": "deep_reasoner",
+        "name": "深度思考",
+        "description": "逐步严密推导、数学证明与逻辑分析",
+        "icon": "Brain",
+        "is_default": False,
+    },
+    {
+        "id": "direct_chat",
+        "name": "直接对话",
+        "description": "极速响应、简洁自然语言问答",
+        "icon": "MessageSquare",
+        "is_default": False,
+    },
+]
+
+
+def get_registered_agents() -> list[dict[str, Any]]:
+    """获取所有已注册的智能体元数据列表."""
+    return list(AGENT_REGISTRY)
+
 
 def resolve_agent_intent(query: str, preference: str) -> str:
     """解析智能体路由意图.

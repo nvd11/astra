@@ -8,6 +8,7 @@ from src.agents.graph import (
     AGENT_PROMPTS,
     astream_chat,
     build_chat_workflow,
+    get_registered_agents,
     llm_node,
     resolve_agent_intent,
     router_node,
@@ -20,6 +21,11 @@ class TestAgentGraph:
 
     def test_resolve_agent_intent(self):
         """测试意图路由逻辑."""
+        # 验证已注册智能体列表
+        agents = get_registered_agents()
+        assert len(agents) >= 4
+        assert any(a["id"] == "auto" and a["is_default"] for a in agents)
+
         # 强制指定偏好优先
         assert resolve_agent_intent("hello", "code_assistant") == "code_assistant"
         assert resolve_agent_intent("def foo():", "deep_reasoner") == "deep_reasoner"
