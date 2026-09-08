@@ -47,6 +47,17 @@ Astra 前端采用全端流体响应式架构，严格对标 DeepSeek Web 沉浸
    - 正在生成的文本末尾显示呼吸脉冲光标（`animate-pulse`），接收到 `[DONE]` 标记后平滑淡出；
    - 自动吸底追踪与脱钩模式：用户向上翻阅时自动暂停滚动并显示“回到最新”悬浮提示按钮，杜绝视口强行拉扯。
 
+### 1.4 多功能模块导航与 RAG 知识库扩展设计 (Extensible Navigation & RAG Hub)
+
+1. **侧边栏功能中枢切换 (Navigation Rail)**：
+   - 侧边栏常驻四大功能模块入口：💬 对话工作台 (`/`)、📚 RAG 知识库 (`/knowledge`)、🧩 智能体广场 (`/agents`)、⚙️ 系统设置 (`/settings`)；
+   - 路由结构由配置表驱动（`routes.ts`），保证未来添加新微应用时无须改动主布局代码。
+2. **RAG 知识库管理与探查页面 (`KnowledgePage.tsx`)**：
+   - **文档与切片探查器**：查看当前用户已上传的文档卡片、切片总数，支持点击查看分片内容及向量化状态；
+   - **向量召回测试实验室**：在前端直接输入测试问题，实时检验 OCI MySQL HeatWave 向量库召回的相关切片及相似度得分（Score）；
+3. **对话流中的知识库即时挂载 (`KnowledgeSelector.tsx`)**：
+   - 输入框上方工具栏支持按需挂载已启用的知识库，提问时自动注入上下文实现 RAG 问答。
+
 ---
 
 ## 2. 目录结构总览
@@ -91,13 +102,15 @@ frontend/
 │   │   ├── conversations.ts
 │   │   ├── messages.ts
 │   │   ├── users.ts
-│   │   └── sessions.ts
+│   │   ├── sessions.ts
+│   │   └── knowledge.ts
 │   ├── stores/
 │   │   ├── authStore.ts
 │   │   ├── chatStore.ts
 │   │   ├── conversationStore.ts
 │   │   ├── userStore.ts
-│   │   └── settingsStore.ts
+│   │   ├── settingsStore.ts
+│   │   └── knowledgeStore.ts
 │   ├── hooks/
 │   │   ├── useAuth.ts
 │   │   ├── useChat.ts
@@ -123,6 +136,10 @@ frontend/
 │   │   │   ├── Header.tsx
 │   │   │   ├── MobileNavDrawer.tsx
 │   │   │   └── ProtectedRoute.tsx
+│   │   ├── knowledge/
+│   │   │   ├── KnowledgeDocList.tsx
+│   │   │   ├── ChunkInspectorModal.tsx
+│   │   │   └── RetrievalTestBox.tsx
 │   │   └── chat/
 │   │       ├── MarkdownRenderer.tsx
 │   │       ├── HtmlArtifactViewer.tsx
@@ -131,11 +148,13 @@ frontend/
 │   │       ├── ChatInput.tsx
 │   │       ├── AgentSelector.tsx
 │   │       ├── ModelSelector.tsx
+│   │       ├── KnowledgeSelector.tsx
 │   │       ├── ConversationList.tsx
 │   │       └── ConversationItem.tsx
 │   ├── pages/
 │   │   ├── LoginPage.tsx
 │   │   ├── ChatPage.tsx
+│   │   ├── KnowledgePage.tsx
 │   │   ├── SettingsPage.tsx
 │   │   ├── ProfilePage.tsx
 │   │   └── NotFoundPage.tsx
