@@ -21,6 +21,7 @@ interface ChatStore {
   currentAgent: AgentType;
   inputPrompt: string;
   isStreaming: boolean;
+  abortController: AbortController | null;
 
   // 响应式布局状态
   isSidebarOpen: boolean; // PC 端侧边栏展开/折叠
@@ -31,10 +32,13 @@ interface ChatStore {
   setActiveConversationId: (id: string | null) => void;
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
+  updateMessage: (id: string, partial: Partial<Message>) => void;
   setCurrentModel: (model: string) => void;
   setCurrentAgent: (agent: AgentType) => void;
   setInputPrompt: (prompt: string) => void;
   setIsStreaming: (isStreaming: boolean) => void;
+  setAbortController: (controller: AbortController | null) => void;
+  stopStreaming: () => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   toggleMobileDrawer: () => void;
@@ -59,9 +63,23 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   currentAgent: 'auto',
   inputPrompt: '',
   isStreaming: false,
+  abortController: null,
 
   isSidebarOpen: true,
   isMobileDrawerOpen: false,
+
+  setAbortController: (abortController) => set({ abortController }),
+
+  stopStreaming: () => {
+    const state = get();
+    if (state.abortController) {
+      state.abortController.abort();
+    }
+    if (state.activeConversationId) {
+      chatService.stopChat(state.activeConversationId);
+    }
+    set({ isStreaming: false, abortController: null });
+  },
 
   fetchModels: async () => {
     set({ isLoadingModels: true });
@@ -118,6 +136,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setMessages: (messages) => set({ messages }),
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
+  updateMessage: (id, partial) =>
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        m.id === id ? { ...m, ...partial } : m
+      ),
+    })),
   setCurrentModel: (model) =>
     set((state) => ({
       currentModel: model,

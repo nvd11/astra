@@ -21,7 +21,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
     availableModels,
     availableAgents,
     isStreaming,
-    setIsStreaming,
+    stopStreaming,
   } = useChatStore();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -54,7 +54,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
   };
 
   const handleStop = () => {
-    setIsStreaming(false);
+    stopStreaming();
   };
 
   const activeAgent =
