@@ -393,17 +393,18 @@ async def list_conversations(
                               │
               ┌───────────────┴───────────────┐
               ▼                               ▼
-┌─────────────────────────┐       ┌─────────────────────────┐
-│      Logto SSO          │       │      Astra Frontend     │
-│   auth.jppwl.asia       │◄─────►│   (React + Vite)        │
-│   微信扫码 / OIDC        │       │   astra.jppwl.asia      │
-└─────────────────────────┘       └─────────────────────────┘
+┌─────────────────────────┐       ┌─────────────────────────────────┐
+│      Logto SSO          │       │      Astra 生产统一网关入口       │
+│   auth.jppwl.asia       │◄─────►│      gw.jppwl.asia              │
+│   微信扫码 / OIDC        │       │  · 前端: /astra/                 │
+└─────────────────────────┘       │  · 后端: /astra/api              │
+                                  └─────────────────────────────────┘
                                               │
                                               ▼
                                     ┌─────────────────────────┐
                                     │      Astra Backend      │
                                     │   (FastAPI + LangGraph) │
-                                    │   api.jppwl.asia        │
+                                    │   /astra/api            │
                                     └─────────────────────────┘
                                               │
                               ┌───────────────┼───────────────┐
@@ -623,26 +624,26 @@ Redis 故障流程：
 
 **认证流程：**
 ```
-用户访问 astra.jppwl.asia
+用户访问 gw.jppwl.asia/astra/
     ↓
 未认证 → 重定向至 auth.jppwl.asia (Logto)
     ↓
 微信扫码 / 账号密码登录
     ↓
-Logto 回调 astra.jppwl.asia/callback 携带 code
+Logto 回调 gw.jppwl.asia/astra/callback 携带 code
     ↓
 后端换取 ID Token + Access Token
     ↓
 创建/同步本地用户，签发 JWT
     ↓
-后续请求携带 JWT 访问 API
+后续请求携带 JWT 访问 API (/astra/api)
 ```
 
 **Logto 配置要点：**
 - **Endpoint**: `https://auth.jppwl.asia`
 - **App ID**: 从 Logto Console 获取
 - **App Secret**: 存储于 K8s Secret
-- **Redirect URI**: `https://astra.jppwl.asia/callback`
+- **Redirect URI**: `https://gw.jppwl.asia/astra/callback`
 - **Scopes**: `openid profile email`
 
 **用户同步策略：**
@@ -711,15 +712,15 @@ astra/
 ```
 用户浏览器
     ↓ HTTPS
-Cloudflare Edge CDN (astra.jppwl.asia)
-    ↓ 回源
-OCI free-arm-vm (Frontend 静态文件)
-    ↓ API 调用
-api.astra.jppwl.asia → Cloudflare → NUC (Backend FastAPI)
+Cloudflare Edge CDN (gw.jppwl.asia)
+    ↓ 回源至 Kong Ingress
+Kong Gateway (路径分流)
+    ├── /astra/    → Frontend (Nginx SPA)
+    └── /astra/api → Backend (FastAPI)
     ↓ 缓存读写
-NUC → OPPO Termux Redis (家宽内网, <1ms)
+Backend → Tailscale Redis (100.105.130.0:6379, <5ms)
     ↓ 持久化
-NUC → OCI MySQL HeatWave (新加坡, ~50ms)
+Backend → OCI MySQL HeatWave (161.118.240.218:3306, <50ms)
 ```
 
 **K8s Node Selector 配置：**
@@ -822,16 +823,16 @@ k8s/
 ├── frontend/
 │   ├── deployment.yaml      # nodeSelector: free-arm-vm, arm64
 │   ├── service.yaml         # ClusterIP
-│   └── httproute.yaml       # Kong: astra.jppwl.asia → frontend:80
+│   └── httproute.yaml       # Kong: gw.jppwl.asia/astra/ → frontend:80
 ├── backend/
-│   ├── deployment.yaml      # nodeSelector: nuc, amd64
+│   ├── deployment.yaml      # nodeSelector: free-arm-vm, arm64
 │   ├── service.yaml         # ClusterIP
-│   ├── httproute.yaml       # Kong: api.astra.jppwl.asia → backend:8000
-│   ├── secret.yaml          # DATABASE_URL, REDIS_URL, JWT_SECRET, LOGTO_*
+│   ├── httproute.yaml       # Kong: gw.jppwl.asia/astra/api → backend:8000
+│   ├── secret.yaml          # DATABASE_URL, REDIS_URL, LITELLM_API_KEY
 │   └── configmap.yaml       # LITELLM_BASE_URL, ENVIRONMENT, LOGTO_ENDPOINT
 └── argocd/
-    ├── frontend-app.yaml    # ArgoCD Application for frontend
-    └── backend-app.yaml     # ArgoCD Application for backend
+    ├── astra-frontend-app.yaml # ArgoCD Application for frontend (generic-web-service-v2)
+    └── astra-backend-app.yaml  # ArgoCD Application for backend (generic-web-service-v2)
 ```
 
 ### 7.4 环境变量
@@ -841,33 +842,28 @@ k8s/
 | `DATABASE_URL` | OCI MySQL 连接串 | K8s Secret |
 | `REDIS_URL` | Redis 连接串 | K8s Secret |
 | `LITELLM_API_KEY` | LiteLLM 网关密钥 | K8s Secret |
-| `LITELLM_BASE_URL` | LiteLLM 网关地址 | K8s ConfigMap |
+| `LITELLM_BASE_URL` | LiteLLM 网关地址 (`https://gw.jppwl.asia/litellm/v1`) | K8s ConfigMap |
 | `JWT_SECRET` | （可选开发回退）：标准 OIDC/Cloudflare 模式直接基于 JWKS 公钥验签，无需此密钥 | K8s Secret（仅自签模式） |
 | `LOGTO_ENDPOINT` | Logto SSO 端点（`https://auth.jppwl.asia`） | K8s ConfigMap |
 | `LOGTO_APP_ID` | Logto 应用 ID | K8s Secret |
 | `LOGTO_APP_SECRET` | Logto 应用密钥 | K8s Secret |
-| `LOGTO_REDIRECT_URI` | 回调地址（`https://astra.jppwl.asia/callback`） | K8s ConfigMap |
+| `LOGTO_REDIRECT_URI` | 回调地址（`https://gw.jppwl.asia/astra/callback`） | K8s ConfigMap |
 | `ENVIRONMENT` | 环境标识（dev/staging/prod） | K8s ConfigMap |
 
-### 7.5 Cloudflare DNS 配置
+### 7.5 Cloudflare DNS 与生产网关配置
 
-需在 Cloudflare 控制台（或 API）为 `jppwl.asia` 添加以下记录：
+统一接入生产网关 `gw.jppwl.asia`（Proxied）：
 
-| 记录类型 | 名称 | 目标 | 代理状态 | 用途 |
-|----------|------|------|----------|------|
-| `A` | `astra` | `43.139.214.231`（腾讯云 K3s） | 🟢 Proxied | 前端入口 |
-| `A` | `api.astra` | `43.139.214.231`（腾讯云 K3s） | 🟢 Proxied | 后端 API |
-
-**Cloudflare 特性自动生效：**
-- 免费 Universal SSL（ECC/RSA 双证书）
-- HTTP/2 & HTTP/3 (QUIC)
-- WebSocket 支持
-- DDoS 防护 + WAF 基础规则
+| 域名与路径 | 目标服务 | 说明 |
+|----------|---------|------|
+| `https://gw.jppwl.asia/astra/` | `astra-frontend:80` | 前端 SPA UI 入口（带 Nginx 历史路由保护） |
+| `https://gw.jppwl.asia/astra/api` | `astra-backend:8000` | 后端 API 入口（带 strip-path 转发至 FastAPI 根路径） |
+| `https://gw.jppwl.asia/litellm/v1` | `litellm-svc:4000` | 私有 LLM 网关接口 |
 
 **Kong HTTPRoute 配置要点：**
-- `astra.jppwl.asia` → 前端 Service（静态文件）
-- `api.astra.jppwl.asia` → 后端 Service（FastAPI）
-- 或单域名路径分流：`/api/*` → 后端，其余 → 前端
+- `gw.jppwl.asia/astra/` → 前端 Service（静态文件）
+- `gw.jppwl.asia/astra/api` → 后端 Service（FastAPI）
+- CORS 严格配置（允许 `https://gw.jppwl.asia` 及本地调试端口 `3000`/`5173`）
 
 ---
 

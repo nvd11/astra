@@ -478,11 +478,11 @@ VITE_LOGTO_REDIRECT_URI=http://localhost:5173/callback
 **功能描述**：生产环境变量。
 
 ```bash
-VITE_API_BASE_URL=https://api.astra.jppwl.asia
+VITE_API_BASE_URL=/astra/api
 VITE_APP_ENV=production
 VITE_LOGTO_ENDPOINT=https://auth.jppwl.asia
 VITE_LOGTO_APP_ID=prod-app-id
-VITE_LOGTO_REDIRECT_URI=https://astra.jppwl.asia/callback
+VITE_LOGTO_REDIRECT_URI=https://gw.jppwl.asia/astra/callback
 ```
 
 ---
@@ -4269,11 +4269,11 @@ npm run lint
 
 | 变量 | 开发环境 | 生产环境 |
 |------|----------|----------|
-| `VITE_API_BASE_URL` | `http://localhost:8000` | `https://api.astra.jppwl.asia` |
+| `VITE_API_BASE_URL` | `/astra/api` (或 `http://localhost:8000`) | `/astra/api` (由 `gw.jppwl.asia` 反代) |
 | `VITE_APP_ENV` | `development` | `production` |
 | `VITE_LOGTO_ENDPOINT` | `https://auth.jppwl.asia` | `https://auth.jppwl.asia` |
 | `VITE_LOGTO_APP_ID` | `dev-app-id` | `prod-app-id` |
-| `VITE_LOGTO_REDIRECT_URI` | `http://localhost:5173/callback` | `https://astra.jppwl.asia/callback` |
+| `VITE_LOGTO_REDIRECT_URI` | `http://localhost:5173/astra/callback` | `https://gw.jppwl.asia/astra/callback` |
 
 ---
 
