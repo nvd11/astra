@@ -34,14 +34,16 @@ export function useTypewriter(options?: UseTypewriterOptions) {
       }
 
       // 动态自适应步长算法 (Dynamic Catch-up Step)
-      // 队列积压大时加速消费，队列平缓时从容优雅
+      // 队列积压大时（如长代码生成）迅速追赶，队列平缓时从容优雅
       const backlog = queueRef.current.length;
       let stepCount = 1;
-      if (backlog > 100) {
-        stepCount = 8;
-      } else if (backlog > 50) {
-        stepCount = 4;
-      } else if (backlog > 20) {
+      if (backlog > 300) {
+        stepCount = Math.min(Math.ceil(backlog / 6), 80);
+      } else if (backlog > 100) {
+        stepCount = 16;
+      } else if (backlog > 40) {
+        stepCount = 6;
+      } else if (backlog > 15) {
         stepCount = 2;
       }
 

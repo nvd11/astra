@@ -8,7 +8,9 @@ import {
   Maximize2,
   Minimize2,
   Download,
+  Loader2,
 } from 'lucide-react';
+import { useChatStore } from '@/stores/chatStore';
 import { cn } from '@/utils/cn';
 
 interface HtmlArtifactViewerProps {
@@ -24,6 +26,7 @@ export const HtmlArtifactViewer: React.FC<HtmlArtifactViewerProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [reloadKey, setReloadKey] = useState<number>(0);
+  const { isStreaming } = useChatStore();
 
   // 组装注入 Tailwind 运行时与安全重置的沙箱文档
   const generateSrcDoc = (rawCode: string): string => `
@@ -165,13 +168,25 @@ export const HtmlArtifactViewer: React.FC<HtmlArtifactViewerProps> = ({
       {/* 主体展示区 */}
       <div className={cn('relative w-full bg-zinc-50 dark:bg-zinc-950', isFullscreen ? 'flex-1' : 'h-80 sm:h-96')}>
         {activeTab === 'preview' ? (
-          <iframe
-            key={reloadKey}
-            srcDoc={generateSrcDoc(code)}
-            sandbox="allow-scripts allow-modals"
-            className="w-full h-full border-0 bg-white"
-            title={title}
-          />
+          isStreaming ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-zinc-50/80 dark:bg-zinc-950/80 text-zinc-500 select-none p-6 text-center">
+              <Loader2 className="w-7 h-7 text-sky-500 animate-spin" />
+              <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                微应用代码正在实时生成中...
+              </div>
+              <p className="text-[11px] text-zinc-400 max-w-sm leading-relaxed">
+                为保证流畅性能，生成完毕后将自动装载执行；点击上方“源码”选项卡可实时查看代码编写进度。
+              </p>
+            </div>
+          ) : (
+            <iframe
+              key={reloadKey}
+              srcDoc={generateSrcDoc(code)}
+              sandbox="allow-scripts allow-modals"
+              className="w-full h-full border-0 bg-white"
+              title={title}
+            />
+          )
         ) : (
           <pre className="w-full h-full p-4 m-0 overflow-auto bg-zinc-950 text-zinc-200 font-mono text-xs leading-relaxed selection:bg-sky-500/30">
             <code>{code}</code>
