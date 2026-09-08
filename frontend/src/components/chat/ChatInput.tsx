@@ -5,7 +5,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
-import { AVAILABLE_AGENTS, AVAILABLE_MODELS } from '@/types';
+import { AVAILABLE_AGENTS } from '@/types';
 import { AgentSelector } from './AgentSelector';
 import { ModelSelector } from './ModelSelector';
 
@@ -19,6 +19,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
     setInputPrompt,
     currentModel,
     currentAgent,
+    availableModels,
     isStreaming,
     setIsStreaming,
   } = useChatStore();
@@ -56,8 +57,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
     setIsStreaming(false);
   };
 
-  const activeAgent = AVAILABLE_AGENTS.find((a) => a.id === currentAgent) || AVAILABLE_AGENTS[0];
-  const activeModel = AVAILABLE_MODELS.find((m) => m.id === currentModel) || AVAILABLE_MODELS[0];
+  const activeAgent =
+    AVAILABLE_AGENTS.find((a) => a.id === currentAgent) || AVAILABLE_AGENTS[0];
+  const activeModel =
+    availableModels.find((m) => m.id === currentModel) || {
+      name: currentModel,
+    };
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4 pb-4 select-none">

@@ -116,6 +116,33 @@ class TestLiteLLMClient:
                 async for _ in client.astream_completion(messages=[]):
                     pass
 
+    @pytest.mark.asyncio
+    async def test_get_models_success(self, client):
+        """测试动态获取网关模型列表 - 成功."""
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "data": [
+                {"id": "gemini-3.8-flash", "object": "model"},
+                {"id": "kimi-k3", "object": "model"},
+            ]
+        }
+        mock_resp.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_get.return_value = mock_resp
+            models = await client.get_models()
+            assert len(models) == 2
+            assert models[0]["id"] == "gemini-3.8-flash"
+            assert models[1]["id"] == "kimi-k3"
+
+    @pytest.mark.asyncio
+    async def test_get_models_error(self, client):
+        """测试动态获取网关模型列表 - 异常降级."""
+        with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
+            mock_get.side_effect = Exception("Gateway unreachable")
+            models = await client.get_models()
+            assert models == []
+
 
 class TestGetLiteLLMClient:
     """get_litellm_client 单例测试."""

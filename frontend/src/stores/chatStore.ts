@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Conversation, Message, AgentType } from '@/types';
+import { Conversation, Message, AgentType, ModelInfo } from '@/types';
+import { chatService } from '@/services/chat';
 
 interface ChatStore {
   // 会话与消息列表
@@ -7,7 +8,11 @@ interface ChatStore {
   activeConversationId: string | null;
   messages: Message[];
 
-  // 偏好与模型状态
+  // 动态模型发现列表 (由 LiteLLM 网关实时同步，严禁 Hardcode)
+  availableModels: ModelInfo[];
+  isLoadingModels: boolean;
+
+  // 偏好与当前模型状态
   currentModel: string;
   currentAgent: AgentType;
   inputPrompt: string;
@@ -31,44 +36,43 @@ interface ChatStore {
   toggleMobileDrawer: () => void;
   setMobileDrawerOpen: (open: boolean) => void;
   startNewChat: () => void;
+  fetchModels: () => Promise<void>;
 }
 
-export const useChatStore = create<ChatStore>((set) => ({
-  conversations: [
-    {
-      id: 'demo-1',
-      session_id: 'session-sample-1',
-      title: 'Python 异步微服务架构讨论',
-      model: 'deepseek-v4-flash',
-      agent_preference: 'code_assistant',
-      system_prompt: null,
-      is_archived: false,
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      updated_at: new Date(Date.now() - 1800000).toISOString(),
-      message_count: 6,
-    },
-    {
-      id: 'demo-2',
-      session_id: 'session-sample-2',
-      title: '傅里叶变换公式严密推导',
-      model: 'gemini-3.8-flash',
-      agent_preference: 'deep_reasoner',
-      system_prompt: null,
-      is_archived: false,
-      created_at: new Date(Date.now() - 86400000).toISOString(),
-      updated_at: new Date(Date.now() - 82800000).toISOString(),
-      message_count: 4,
-    },
-  ],
+export const useChatStore = create<ChatStore>((set, get) => ({
+  conversations: [],
   activeConversationId: null,
   messages: [],
-  currentModel: 'deepseek-v4-flash',
+
+  // 动态模型初始列表
+  availableModels: [],
+  isLoadingModels: false,
+
+  currentModel: 'gemini-3.8-flash',
   currentAgent: 'auto',
   inputPrompt: '',
   isStreaming: false,
 
   isSidebarOpen: true,
   isMobileDrawerOpen: false,
+
+  fetchModels: async () => {
+    set({ isLoadingModels: true });
+    const models = await chatService.getModels();
+    if (models.length > 0) {
+      const defaultModel = models.find((m) => m.is_default) || models[0];
+      const state = get();
+      const currentStillValid = models.some((m) => m.id === state.currentModel);
+
+      set({
+        availableModels: models,
+        currentModel: currentStillValid ? state.currentModel : defaultModel.id,
+        isLoadingModels: false,
+      });
+    } else {
+      set({ isLoadingModels: false });
+    }
+  },
 
   setConversations: (conversations) => set({ conversations }),
   setActiveConversationId: (id) =>
