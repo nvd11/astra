@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env-template
+!frontend/.env.development
+!frontend/.env.production
 *.local
 
 # Python
