@@ -42,7 +42,7 @@ class LiteLLMClient:
     def _normalize_model(self, model: str | None) -> str:
         """规范化模型标识.
 
-        若模型未包含提供商前缀，且连接至统一 OpenAI 兼容网关，补充 openai/ 前缀.
+        直连统一 OpenAI 兼容私有网关时，去除提供商前缀以精确匹配网关中注册的模型标识.
 
         Args:
             model: 用户或请求传入的模型名称
@@ -51,8 +51,8 @@ class LiteLLMClient:
             str: 格式化后的模型标识
         """
         target_model = model or self.default_model
-        if "/" not in target_model:
-            return f"openai/{target_model}"
+        if target_model.startswith("openai/"):
+            return target_model[len("openai/") :]
         return target_model
 
     async def acompletion(
@@ -84,6 +84,7 @@ class LiteLLMClient:
         try:
             response = await litellm.acompletion(
                 model=formatted_model,
+                custom_llm_provider="openai",
                 messages=messages,
                 api_base=self.base_url,
                 api_key=self.api_key,
@@ -141,6 +142,7 @@ class LiteLLMClient:
         try:
             response = await litellm.acompletion(
                 model=formatted_model,
+                custom_llm_provider="openai",
                 messages=messages,
                 api_base=self.base_url,
                 api_key=self.api_key,
