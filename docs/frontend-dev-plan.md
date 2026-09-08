@@ -224,6 +224,7 @@ frontend/
     "zustand": "^4.4.7",
     "react-markdown": "^9.0.1",
     "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0",
     "rehype-katex": "^7.0.0",
     "react-syntax-highlighter": "^15.5.0",
     "katex": "^0.16.9",
@@ -3020,14 +3021,18 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
 ### 11.1 `frontend/src/components/chat/MarkdownRenderer.tsx`
 
-**功能描述**：Markdown 渲染组件，支持 GFM、LaTeX、代码高亮。
+**功能描述**：全功能 Markdown 渲染组件，支持 GFM 表格、LaTeX 科学计算公式、代码高亮与动态 HTML 交互沙箱智能拦截。
 
 ```typescript
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Check, Copy } from 'lucide-react';
+import { HtmlArtifactViewer } from './HtmlArtifactViewer';
 import 'katex/dist/katex.min.css';
 import { cn } from '@/utils/cn';
 
@@ -3038,43 +3043,48 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
   return (
-    <div className={cn('prose prose-sm dark:prose-invert max-w-none', className)}>
+    <div className={cn('prose prose-sm dark:prose-invert max-w-none break-words', className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          code({ node, inline, className, children, ...props }) {
+          code({ inline, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '');
-            return !inline && match ? (
-              <SyntaxHighlighter
-                style={vscDarkPlus}
-                language={match[1]}
-                PreTag="div"
-                {...props}
-              >
-                {String(children).replace(/\n$/, '')}
-              </SyntaxHighlighter>
-            ) : (
-              <code className={className} {...props}>
+            const lang = match ? match[1].toLowerCase() : '';
+            const codeString = String(children).replace(/\n$/, '');
+
+            // 1. 如果是 HTML 且包含可执行 DOM 标签，升级为交互式 Artifact 沙箱
+            if (!inline && lang === 'html' && (codeString.includes('<div') || codeString.includes('<html') || codeString.includes('<canvas') || codeString.includes('<script'))) {
+              return <HtmlArtifactViewer code={codeString} title="HTML 交互沙箱组件" />;
+            }
+
+            // 2. 常规多行代码块：带语言标签与一键复制代码按钮
+            if (!inline && match) {
+              return <CodeBlock language={lang} code={codeString} />;
+            }
+
+            // 3. 行内代码
+            return (
+              <code className={cn('px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-sky-600 dark:text-sky-400 font-mono text-xs', className)} {...props}>
                 {children}
               </code>
             );
           },
           table({ children }) {
             return (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border">{children}</table>
+              <div className="overflow-x-auto my-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800 text-xs">{children}</table>
               </div>
             );
           },
           th({ children }) {
             return (
-              <th className="px-4 py-2 bg-muted font-medium text-left text-sm">{children}</th>
+              <th className="px-3 py-2 bg-zinc-50 dark:bg-zinc-900 font-semibold text-left text-zinc-700 dark:text-zinc-300 border-b border-zinc-200 dark:border-zinc-800">{children}</th>
             );
           },
           td({ children }) {
             return (
-              <td className="px-4 py-2 border-t text-sm">{children}</td>
+              <td className="px-3 py-2 border-t border-zinc-100 dark:border-zinc-800/60 text-zinc-600 dark:text-zinc-400">{children}</td>
             );
           },
         }}
@@ -3084,18 +3094,162 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
     </div>
   );
 }
+
+function CodeBlock({ language, code }: { language: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative my-3 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-950 font-mono text-xs shadow-sm">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900/90 border-b border-zinc-800/60 text-zinc-400">
+        <span className="text-[11px] font-medium uppercase tracking-wider">{language}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-[11px] hover:text-white transition-colors"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          <span>{copied ? '已复制' : '复制'}</span>
+        </button>
+      </div>
+      <SyntaxHighlighter
+        style={vscDarkPlus}
+        language={language}
+        PreTag="div"
+        customStyle={{ margin: 0, padding: '12px', background: 'transparent' }}
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
 ```
 
-**Props 说明**：
-- `content`：Markdown 文本内容
-- `className`：自定义类名
+---
 
-**核心逻辑**：
-- 使用 `react-markdown` 渲染 Markdown
-- `remark-gfm` 支持 GFM 表格、删除线等
-- `rehype-katex` 渲染 LaTeX 公式
-- `react-syntax-highlighter` 提供代码块语法高亮
-- 自定义 `table/th/td` 组件实现响应式表格样式
+### 11.2 `frontend/src/components/chat/HtmlArtifactViewer.tsx`
+
+**功能描述**：零信任动态 HTML 交互沙箱组件 (对标 Claude Artifacts)。
+
+```typescript
+import React, { useState, useRef } from 'react';
+import { Play, Code2, RotateCw, Copy, Check, Maximize2, Download } from 'lucide-react';
+import { cn } from '@/utils/cn';
+
+interface HtmlArtifactViewerProps {
+  code: string;
+  title?: string;
+}
+
+export function HtmlArtifactViewer({ code, title = 'HTML 交互沙箱组件' }: HtmlArtifactViewerProps) {
+  const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
+  const [copied, setCopied] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // 注入 Tailwind CSS 运行时与基础样式重置
+  const generateSrcDoc = (rawCode: string) => `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 16px; }
+        </style>
+      </head>
+      <body>
+        ${rawCode}
+      </body>
+    </html>
+  `;
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([generateSrcDoc(code)], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'artifact.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className={cn(
+      'my-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm overflow-hidden transition-all',
+      isFullscreen && 'fixed inset-4 z-50 shadow-2xl flex flex-col my-0'
+    )}>
+      {/* 顶部工具栏 */}
+      <div className="flex items-center justify-between px-3.5 py-2 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
+        <div className="flex items-center gap-2">
+          {/* 双选项卡切换 */}
+          <div className="flex items-center bg-zinc-200/80 dark:bg-zinc-800 p-0.5 rounded-lg text-xs font-medium">
+            <button
+              onClick={() => setActiveTab('preview')}
+              className={cn('flex items-center gap-1 px-2.5 py-1 rounded-md transition-all', activeTab === 'preview' ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400')}
+            >
+              <Play className="w-3 h-3 text-emerald-500" />
+              <span>实时预览</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('code')}
+              className={cn('flex items-center gap-1 px-2.5 py-1 rounded-md transition-all', activeTab === 'code' ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs' : 'text-zinc-600 dark:text-zinc-400')}
+            >
+              <Code2 className="w-3 h-3 text-sky-500" />
+              <span>源码</span>
+            </button>
+          </div>
+          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hidden sm:inline">{title}</span>
+        </div>
+
+        {/* 辅助工具 */}
+        <div className="flex items-center gap-1">
+          <button onClick={() => setReloadKey((k) => k + 1)} className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg" title="重新加载沙箱">
+            <RotateCw className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={handleCopy} className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg" title="复制代码">
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+          <button onClick={handleDownload} className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg" title="导出为 HTML 文件">
+            <Download className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-lg" title={isFullscreen ? '退出全屏' : '全屏预览'}>
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* 主体区域 */}
+      <div className={cn('relative w-full', isFullscreen ? 'flex-1' : 'h-80')}>
+        {activeTab === 'preview' ? (
+          <iframe
+            key={reloadKey}
+            srcDoc={generateSrcDoc(code)}
+            sandbox="allow-scripts allow-modals"
+            className="w-full h-full border-0 bg-white"
+            title={title}
+          />
+        ) : (
+          <pre className="w-full h-full p-4 m-0 overflow-auto bg-zinc-950 text-zinc-100 font-mono text-xs leading-relaxed">
+            <code>{code}</code>
+          </pre>
+        )}
+      </div>
+    </div>
+  );
+}
+```
 
 ---
 
