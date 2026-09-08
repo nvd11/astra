@@ -49,6 +49,7 @@
 | P1 | **Agent 选择器** | 手动指定 Sub-Agent 或自动路由 |
 | P1 | **LLM 模型选择器** | 切换底层模型（DeepSeek / Gemini / Claude 等） |
 | P1 | **动态 HTML 交互沙箱 (Artifacts)** | 支持 HTML/JS/CSS 实时渲染预览与双态切换 (代码/预览)、Sandboxed iFrame 零信任安全隔离、全屏与导出 |
+| P1 | **多功能导航与扩展入口** | 侧边栏/主导航常驻功能中枢入口，预留 RAG 知识库信息浏览、切片检索、Agent 广场及未来微应用扩展 |
 | P2 | 代码块增强 | 行号、复制按钮、语言标识 |
 | P2 | 导出功能 | Markdown / PDF / PNG 导出（仅限当前用户会话） |
 
@@ -343,6 +344,33 @@ async def list_conversations(
   1. 前端立即触发本地 `AbortController.abort()` 瞬间断开 SSE 长连接；
   2. 异步向后端 `POST /chat/stop` 触发分布式中止信号；
   3. 清空未消费的字符缓冲队列，打字光标立即定格，保全已收到的内容，整个流程零卡顿、无延时。
+
+---
+
+### 2.10 多功能模块导航与 RAG 知识库扩展设计 (Extensible Navigation & RAG Hub)
+
+**核心设计目标**：超越单一的 Chat 界面，将 Astra 打造为可无限横向扩展的模块化 AI 工作台。界面预留清晰、直观的功能导航入口，第一期无缝承接已在后端建好表结构的 **RAG 向量知识库浏览与检索**，并为后续插件、微应用提供即插即用的路由与组件槽位。
+
+#### 1. 侧边栏多模块功能中枢 (App Switcher & Navigation Rail)
+
+* **模块化主入口分布**：
+  侧边栏采用分组架构，顶部为核心功能切换，底部为历史对话与系统设置：
+  1. 💬 **对话工作台 (Chat - `/`)**：核心多轮对话、流式推理与 Artifacts 预览；
+  2. 📚 **RAG 知识库工坊 (Knowledge Base - `/knowledge`)**：
+     - **文档资产浏览**：以卡片/列表形式展示当前用户上传的知识库文档（文件类型、文档名、切片数量、向量化状态、上传时间）；
+     - **切片与向量探查器 (Chunk Inspector)**：点击文档即可展开抽屉/模态框，查看文档被分割出的每一个分片内容（Chunk Text）及其对应的 Embedding 维度信息；
+     - **相似度检索实验室 (Retrieval Playground)**：提供快速提问测试框，输入任意 Query，实时展示基于 OCI MySQL HeatWave 向量检索召回的 Top-K 切片及其相似度得分（Score）；
+  3. 🧩 **智能体广场 (Agent Hub - `/agents`)**：预留浏览、调试与自定义 Sub-Agent 提示词的微应用入口；
+  4. ⚙️ **设置与设备管理 (Settings - `/settings`)**：多设备会话管理 (Sessions)、实时 Token 用量仪表盘、模型偏好设置。
+
+#### 2. 对话流内的 RAG 知识库即时挂载 (In-Chat Context Attachment)
+
+* 在主聊天界面的底部输入工具栏中，除了【Agent 选择器】与【Model 选择器】，预留第三个胶囊组件：**【知识库挂载徽章 (Knowledge Pinning)】**；
+* 用户可在提问前快速勾选某个知识库，提问时携带 `knowledge_id`，触发后端的向量语义召回作为上下文注入 Prompt，实现真正的即点即查、知行合一。
+
+#### 3. 插件化架构扩展性保障 (Code Cleanliness & Extensibility)
+
+* **路由配置表驱动 (`routes.ts`)**：导航条目完全由静态配置数组生成，未来接入“数据分析看板”、“代码执行器”等新功能时，只需在配置文件注册页面组件与 Icon，侧边栏、快捷键与权限守卫自动就绪，遵循开闭原则（OCP）。
 
 ---
 
