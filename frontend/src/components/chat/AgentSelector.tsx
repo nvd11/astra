@@ -82,7 +82,7 @@ export const AgentSelector: React.FC = () => {
 
       {/* 悬浮 Popover 菜单 */}
       {isOpen && (
-        <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md shadow-xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
           <div className="px-2.5 py-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
             智能体路由偏好
           </div>
