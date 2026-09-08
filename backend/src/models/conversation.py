@@ -21,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.models.user import Base
+from src.models.user import Base, UserSession
 
 
 class Conversation(Base):
@@ -140,9 +140,17 @@ class ConversationRepository:
         Returns:
             Conversation: 创建的会话实体
         """
+        valid_session_id = None
+        if session_id:
+            res = await self.session.execute(
+                select(UserSession.id).where(UserSession.id == session_id)
+            )
+            if res.scalar_one_or_none():
+                valid_session_id = session_id
+
         conversation = Conversation(
             user_id=user_id,
-            session_id=session_id,
+            session_id=valid_session_id,
             title=title,
             model=model,
             agent_preference=agent_preference,
@@ -301,10 +309,18 @@ class MessageRepository:
         Returns:
             Message: 创建的消息实体
         """
+        valid_session_id = None
+        if session_id:
+            res = await self.session.execute(
+                select(UserSession.id).where(UserSession.id == session_id)
+            )
+            if res.scalar_one_or_none():
+                valid_session_id = session_id
+
         msg = Message(
             conversation_id=conversation_id,
             user_id=user_id,
-            session_id=session_id,
+            session_id=valid_session_id,
             role=role,
             content=content,
             message_metadata=metadata,

@@ -77,11 +77,12 @@ export const chatService = {
     const sessionId = storage.getSessionId();
     const token = storage.getToken();
 
-    const headers: Record<string, string> = {
-      'X-Session-ID': sessionId,
-    };
+    const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+      if (sessionId) {
+        headers['X-Session-ID'] = sessionId;
+      }
     }
 
     const response = await axios.post<BaseResponse<Conversation>>(
@@ -112,10 +113,12 @@ export const chatService = {
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Session-ID': sessionId,
     };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+      if (sessionId) {
+        headers['X-Session-ID'] = sessionId;
+      }
     }
 
     const bodyPayload = {
