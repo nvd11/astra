@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.agents.graph import astream_chat
+from src.agents.graph import astream_chat, get_registered_agents
 from src.configs.config import Settings, get_settings
 from src.engine.litellm_client import get_litellm_client
 from src.engine.mysql_client import get_db_session, get_mysql_client
@@ -343,3 +343,15 @@ async def list_models(
         logger.warning(f"Redis cache write error for models: {err}")
 
     return BaseResponse(code=0, message="success", data=parsed_models)
+
+
+@router.get(
+    "/agents",
+    response_model=BaseResponse[list[dict[str, Any]]],
+    summary="动态获取支持的智能体列表",
+    description="从后端 LangGraph 编排引擎动态导出支持的智能体清单作为唯一信任源",
+)
+async def list_agents() -> BaseResponse[list[dict[str, Any]]]:
+    """动态获取智能体清单端点."""
+    agents = get_registered_agents()
+    return BaseResponse(code=0, message="success", data=agents)

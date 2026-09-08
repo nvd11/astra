@@ -5,7 +5,6 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
-import { AVAILABLE_AGENTS } from '@/types';
 import { AgentSelector } from './AgentSelector';
 import { ModelSelector } from './ModelSelector';
 
@@ -20,6 +19,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
     currentModel,
     currentAgent,
     availableModels,
+    availableAgents,
     isStreaming,
     setIsStreaming,
   } = useChatStore();
@@ -58,7 +58,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
   };
 
   const activeAgent =
-    AVAILABLE_AGENTS.find((a) => a.id === currentAgent) || AVAILABLE_AGENTS[0];
+    availableAgents.find((a) => a.id === currentAgent) || {
+      name: currentAgent === 'auto' ? '自动路由' : currentAgent,
+    };
   const activeModel =
     availableModels.find((m) => m.id === currentModel) || {
       name: currentModel,

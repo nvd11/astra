@@ -6,12 +6,13 @@ import {
   MessageSquare,
   ChevronDown,
   Check,
+  Loader2,
 } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
-import { AVAILABLE_AGENTS, AgentType } from '@/types';
+import { AgentType } from '@/types';
 import { cn } from '@/utils/cn';
 
-const AGENT_ICON_MAP = {
+const AGENT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Sparkles,
   Code2,
   Brain,
@@ -21,10 +22,26 @@ const AGENT_ICON_MAP = {
 export const AgentSelector: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { currentAgent, setCurrentAgent } = useChatStore();
+  const {
+    currentAgent,
+    setCurrentAgent,
+    availableAgents,
+    isLoadingAgents,
+    fetchAgents,
+  } = useChatStore();
 
-  const activeAgent =
-    AVAILABLE_AGENTS.find((a) => a.id === currentAgent) || AVAILABLE_AGENTS[0];
+  // 组件挂载时动态拉取智能体清单
+  useEffect(() => {
+    fetchAgents();
+  }, [fetchAgents]);
+
+  const activeAgent = availableAgents.find((a) => a.id === currentAgent) || {
+    id: currentAgent,
+    name: currentAgent === 'auto' ? '自动路由' : currentAgent,
+    description: '当前所选智能体',
+    icon: 'Sparkles',
+  };
+
   const ActiveIcon =
     AGENT_ICON_MAP[activeAgent.icon as keyof typeof AGENT_ICON_MAP] || Sparkles;
 
@@ -83,54 +100,66 @@ export const AgentSelector: React.FC = () => {
       {/* 悬浮 Popover 菜单 */}
       {isOpen && (
         <div className="absolute left-0 bottom-full mb-2 w-64 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-2.5 py-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-            智能体路由偏好
+          <div className="flex items-center justify-between px-2.5 py-1">
+            <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+              智能体路由偏好 (LangGraph 动态同步)
+            </span>
+            {isLoadingAgents && (
+              <Loader2 className="w-3 h-3 text-sky-500 animate-spin" />
+            )}
           </div>
 
-          <div className="space-y-0.5 mt-1">
-            {AVAILABLE_AGENTS.map((agent) => {
-              const isSelected = agent.id === currentAgent;
-              const Icon =
-                AGENT_ICON_MAP[agent.icon as keyof typeof AGENT_ICON_MAP] ||
-                Sparkles;
+          <div className="space-y-0.5 mt-1 max-h-64 overflow-y-auto">
+            {availableAgents.length === 0 ? (
+              <div className="px-3 py-4 text-center text-xs text-zinc-400 flex items-center justify-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-500" />
+                <span>正在同步智能体...</span>
+              </div>
+            ) : (
+              availableAgents.map((agent) => {
+                const isSelected = agent.id === currentAgent;
+                const Icon =
+                  AGENT_ICON_MAP[agent.icon as keyof typeof AGENT_ICON_MAP] ||
+                  Sparkles;
 
-              return (
-                <div
-                  key={agent.id}
-                  onClick={() => handleSelect(agent.id)}
-                  className={cn(
-                    'flex items-center justify-between px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all',
-                    isSelected
-                      ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 font-medium'
-                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60'
-                  )}
-                >
-                  <div className="flex items-center gap-2.5 truncate pr-2">
-                    <div
-                      className={cn(
-                        'w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0',
-                        isSelected
-                          ? 'bg-sky-500 text-white'
-                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
-                      )}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
+                return (
+                  <div
+                    key={agent.id}
+                    onClick={() => handleSelect(agent.id)}
+                    className={cn(
+                      'flex items-center justify-between px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all',
+                      isSelected
+                        ? 'bg-sky-50 dark:bg-sky-950/40 text-sky-950 dark:text-sky-200 font-medium'
+                        : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60'
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5 truncate pr-2">
+                      <div
+                        className={cn(
+                          'w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0',
+                          isSelected
+                            ? 'bg-sky-500 text-white'
+                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                        )}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
 
-                    <div className="truncate">
-                      <div className="text-xs truncate">{agent.name}</div>
-                      <div className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate mt-0.5 font-normal">
-                        {agent.description}
+                      <div className="truncate">
+                        <div className="text-xs truncate">{agent.name}</div>
+                        <div className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate mt-0.5 font-normal">
+                          {agent.description}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {isSelected && (
-                    <Check className="w-4 h-4 text-sky-500 flex-shrink-0" />
-                  )}
-                </div>
-              );
-            })}
+                    {isSelected && (
+                      <Check className="w-4 h-4 text-sky-500 flex-shrink-0" />
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

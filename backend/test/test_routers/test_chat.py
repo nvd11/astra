@@ -253,3 +253,17 @@ class TestChatRouter:
             assert data["data"][1]["provider"] == "Moonshot"
             assert data["data"][2]["provider"] == "OpenAI"
             mock_redis.setex.assert_called_once()
+
+    def test_list_agents(self, client: TestClient, app):
+        """测试获取支持的智能体列表."""
+        response = client.get("/chat/agents")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["code"] == 0
+        agents = data["data"]
+        assert len(agents) >= 4
+        ids = [a["id"] for a in agents]
+        assert "auto" in ids
+        assert "code_assistant" in ids
+        assert "deep_reasoner" in ids
+        assert "direct_chat" in ids
