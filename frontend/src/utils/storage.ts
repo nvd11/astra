@@ -40,8 +40,8 @@ export const storage = {
   // 主题模式 (dark / light)
   getTheme(): 'dark' | 'light' {
     const theme = localStorage.getItem(THEME_KEY);
-    if (theme === 'light') return 'light';
-    return 'dark'; // 默认极客深色
+    if (theme === 'dark') return 'dark';
+    return 'light'; // 默认优雅明亮浅色
   },
   setTheme(theme: 'dark' | 'light'): void {
     localStorage.setItem(THEME_KEY, theme);

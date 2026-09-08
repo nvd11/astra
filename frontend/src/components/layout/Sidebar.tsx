@@ -41,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="h-full w-64 flex flex-col bg-zinc-100/70 dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 select-none">
+    <aside className="h-full w-64 flex flex-col bg-zinc-50 dark:bg-zinc-950 border-r border-zinc-200/80 dark:border-zinc-800 select-none">
       {/* 顶部 Logo 与新对话按钮 */}
       <div className="p-3.5 space-y-3">
         <div className="flex items-center gap-2.5 px-2 py-1">
@@ -51,7 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="font-bold text-base tracking-tight text-zinc-900 dark:text-white">
             Astra
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-mono">
             v1.0
           </span>
         </div>
@@ -73,8 +73,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={cn(
             'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
             currentTab === 'chat'
-              ? 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white'
-              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-900'
+              ? 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold'
+              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-900'
           )}
         >
           <MessageSquare className="w-4 h-4" />
@@ -86,8 +86,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={cn(
             'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors',
             currentTab === 'knowledge'
-              ? 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white'
-              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-900'
+              ? 'bg-zinc-200/80 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold'
+              : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-900'
           )}
         >
           <BookOpen className="w-4 h-4 text-emerald-500" />
@@ -115,8 +115,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={cn(
                 'group relative flex items-center justify-between px-3 py-2.5 rounded-lg text-xs cursor-pointer transition-all',
                 isActive
-                  ? 'bg-zinc-200/80 dark:bg-zinc-800/90 text-zinc-900 dark:text-white font-medium'
-                  : 'text-zinc-700 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-900/60'
+                  ? 'bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-white font-medium shadow-xs border border-zinc-200/80 dark:border-transparent'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-900/60'
               )}
             >
               <div className="flex items-center gap-2 truncate pr-6">

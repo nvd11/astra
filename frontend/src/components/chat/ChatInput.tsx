@@ -64,7 +64,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
   return (
     <div className="w-full max-w-3xl mx-auto px-4 pb-4 select-none">
       {/* 悬浮输入卡片 */}
-      <div className="relative rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 shadow-lg dark:shadow-2xl transition-all focus-within:border-zinc-400 dark:focus-within:border-zinc-600">
+      <div className="relative rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 shadow-md hover:shadow-lg dark:shadow-2xl transition-all focus-within:border-zinc-400 dark:focus-within:border-zinc-600">
         {/* 上方胶囊选择器工具条 (水平防溢出横滑) */}
         <div className="px-3 pt-2.5 pb-1 flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-zinc-100 dark:border-zinc-800/50">
           {/* Agent 选择器 */}
@@ -72,7 +72,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
             <select
               value={currentAgent}
               onChange={(e) => setCurrentAgent(e.target.value as AgentType)}
-              className="appearance-none pl-6 pr-7 py-1 text-xs font-medium rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer border border-transparent transition-all outline-none"
+              className="appearance-none pl-6 pr-7 py-1 text-xs font-medium rounded-full bg-zinc-100/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/80 dark:hover:bg-zinc-700 cursor-pointer border border-zinc-200/70 dark:border-transparent transition-all outline-none shadow-2xs"
             >
               {AVAILABLE_AGENTS.map((agent) => (
                 <option key={agent.id} value={agent.id} className="bg-white dark:bg-zinc-900">
@@ -89,7 +89,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
             <select
               value={currentModel}
               onChange={(e) => setCurrentModel(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1 text-xs font-medium rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer border border-transparent transition-all outline-none"
+              className="appearance-none pl-3 pr-7 py-1 text-xs font-medium rounded-full bg-zinc-100/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/80 dark:hover:bg-zinc-700 cursor-pointer border border-zinc-200/70 dark:border-transparent transition-all outline-none shadow-2xs"
             >
               {AVAILABLE_MODELS.map((model) => (
                 <option key={model.id} value={model.id} className="bg-white dark:bg-zinc-900">
