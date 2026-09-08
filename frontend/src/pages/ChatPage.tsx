@@ -159,7 +159,7 @@ export const ChatPage: React.FC = () => {
         {messages.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="max-w-4xl xl:max-w-5xl mx-auto space-y-6">
             {messages.map((msg) => {
               const isCurrentStreamingMsg =
                 msg.id === activeAssistantMsgIdRef.current;
@@ -170,29 +170,35 @@ export const ChatPage: React.FC = () => {
               return (
                 <div
                   key={msg.id}
-                  className={`flex gap-3.5 ${
-                    msg.role === 'user' ? 'justify-end' : 'justify-start'
+                  className={`flex gap-3.5 sm:gap-4 ${
+                    msg.role === 'user' ? 'justify-end' : 'justify-start w-full'
                   } animate-in fade-in duration-200`}
                 >
                   {/* Assistant 头像 */}
                   {msg.role !== 'user' && (
-                    <div className="w-7 h-7 rounded-lg bg-sky-500 flex items-center justify-center text-white flex-shrink-0 mt-0.5 shadow-sm shadow-sky-500/20">
+                    <div className="w-8 h-8 rounded-xl bg-sky-500 flex items-center justify-center text-white flex-shrink-0 mt-1 shadow-sm shadow-sky-500/20">
                       <Sparkles className="w-4 h-4 fill-current" />
                     </div>
                   )}
 
-                  {/* 消息气泡卡片 */}
-                  <div className="max-w-[88%] sm:max-w-[82%] space-y-1.5">
+                  {/* 消息主体容器 (AI 回复充分舒展占据全宽) */}
+                  <div
+                    className={
+                      msg.role === 'user'
+                        ? 'max-w-[88%] sm:max-w-[75%] space-y-1.5'
+                        : 'flex-1 min-w-0 space-y-1.5'
+                    }
+                  >
                     {/* 消息元数据标签 (Agent / Model) */}
                     {msg.role !== 'user' && msg.metadata?.agent && (
-                      <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-medium pl-1">
-                        <Cpu className="w-3 h-3" />
+                      <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-medium pl-1">
+                        <Cpu className="w-3.5 h-3.5" />
                         <span>{msg.metadata.agent}</span>
                       </div>
                     )}
 
                     <div
-                      className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                      className={`rounded-2xl px-5 py-4 text-sm leading-relaxed ${
                         msg.role === 'user'
                           ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-br-sm shadow-sm'
                           : 'bg-white text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 rounded-bl-sm border border-zinc-200/80 dark:border-zinc-800 shadow-xs'
@@ -201,7 +207,7 @@ export const ChatPage: React.FC = () => {
                       {msg.role === 'user' ? (
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       ) : (
-                        <div>
+                        <div className="w-full">
                           <MarkdownRenderer content={contentToDisplay} />
                           {/* 呼吸脉冲打字光标 */}
                           {isCurrentStreamingMsg && typewriter.isTyping && (
@@ -214,7 +220,7 @@ export const ChatPage: React.FC = () => {
 
                   {/* User 头像 */}
                   {msg.role === 'user' && (
-                    <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300 flex-shrink-0 mt-0.5">
+                    <div className="w-8 h-8 rounded-xl bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-300 flex-shrink-0 mt-1">
                       <UserIcon className="w-4 h-4" />
                     </div>
                   )}
