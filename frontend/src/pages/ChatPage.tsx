@@ -6,7 +6,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { useTypewriter } from '@/hooks/useTypewriter';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { chatService } from '@/services/chat';
-import { Message, Conversation } from '@/types';
+import { Message } from '@/types';
 import { storage } from '@/utils/storage';
 
 export const ChatPage: React.FC = () => {
@@ -75,23 +75,13 @@ export const ChatPage: React.FC = () => {
         convId = newConv.id;
         setActiveConversationId(convId);
         setConversations([newConv, ...conversations]);
-      } catch (e) {
-        // 离线/降级模式下自建本地 ID
-        convId = `conv-${Date.now()}`;
-        const fallbackConv: Conversation = {
-          id: convId,
-          session_id: storage.getSessionId(),
-          title: titleCandidate,
-          model: currentModel,
-          agent_preference: currentAgent,
-          system_prompt: null,
-          is_archived: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          message_count: 1,
-        };
-        setActiveConversationId(convId);
-        setConversations([fallbackConv, ...conversations]);
+      } catch (e: unknown) {
+        console.error('Failed to create conversation:', e);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        typewriter.enqueue(`*(创建会话失败: ${errMsg})*`);
+        typewriter.flush();
+        setIsStreaming(false);
+        return;
       }
     }
 
