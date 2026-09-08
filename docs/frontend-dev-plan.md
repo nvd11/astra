@@ -72,7 +72,11 @@ Astra 前端采用全端流体响应式架构，严格对标 DeepSeek Web 沉浸
    - **严禁前端代码硬编码模型静态列表**；
    - 页面启动时由 `useChatStore` 异步触发 `fetchModels()`，调用 `GET /astra/api/chat/models` 接口实时获取 LiteLLM 网关当前挂载的真实模型清单；
    - 动态识别模型前缀并自动挂载对应提供商标签（Google, Moonshot, OpenAI 等），根据后端 `is_default` 自动激活默认模型；
-   - LiteLLM 网关热增删模型时，前端零改动、零构建，自动实时生效。
+   - LiteLLM 网关热增删模型时，前端零改动、零构建，自动实时同步。
+4. **智能体全动态发现与单一信任源原则 (Dynamic Agent Discovery & SSOT)**：
+   - **严禁前端代码硬编码智能体静态常量**（如 `AVAILABLE_AGENTS`）；
+   - 前端启动时由 `useChatStore` 异步触发 `fetchAgents()`，从 `/astra/api/chat/agents` 动态拉取后端 LangGraph 状态机当前注册支持的智能体元数据；
+   - `AgentSelector.tsx` 完全基于接口下发数据动态渲染，后端扩充智能体或调整 Prompt 预设时，前端零改动即可自动生效。
 
 ---
 

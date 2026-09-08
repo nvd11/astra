@@ -83,18 +83,18 @@
 
 ### 2.4 Agent 与 LLM 选择器
 
-**Agent 选择器（可选手动指定）：**
+**智能体动态注册与发现机制 (LangGraph 状态机单源驱动，严禁 Hardcode)：**
 
-用户可在输入框上方选择当前对话使用的 Agent 模式：
+智能体列表**严禁在前端代码中静态硬编码**，必须由后端的 LangGraph 编排引擎统一作为唯一信任源（SSOT）动态下发：
 
-| 模式 | 说明 | 适用场景 |
-|------|------|----------|
-| **自动路由**（默认） | Main Agent 自动识别意图并分发 | 通用对话，不确定用哪个 |
-| **代码助手** | 强制路由至 `code_agent` | 编程、调试、代码审查 |
-| **搜索增强** | 强制路由至 `search_agent` | 实时信息、文档检索 |
-| **数据分析** | 强制路由至 `analysis_agent` | 数据处理、图表生成 |
-| **创意写作** | 强制路由至 `creative_agent` | 文案、头脑风暴 |
-| **通用对话** | 强制路由至 `general_agent` | 闲聊、简单问答 |
+1. **后端注册中心发现端点 (`GET /astra/api/chat/agents`)**：
+   - 后端基于 `src/agents/graph.py` 中的真实智能体编排注册表（`AGENT_REGISTRY`）统一定义并下发支持的 Sub-Agent 清单（包含 `id`, `name`, `description`, `icon`, `is_default`）；
+   - 支持动态路由默认项 `auto`（由 Main Agent 自适应意图分类），以及专精子代理（`code_assistant` 代码助手、`deep_reasoner` 深度思考、`direct_chat` 直接对话等）。
+
+2. **前端响应式消费与动态呈现**：
+   - 前端 Store (`chatStore.ts`) 异步触发 `fetchAgents()`，在组件挂载时动态拉取注册智能体列表；
+   - `AgentSelector.tsx` 浮层菜单完全基于接口下发数据动态渲染，图标与描述与后端 LangGraph 严格对齐；
+   - 后续在后端扩充搜索、分析等新智能体时，前端零改动即可自动生效。
 
 **LLM 模型动态发现机制 (全动态网关同步，严禁 Hardcode)：**
 
