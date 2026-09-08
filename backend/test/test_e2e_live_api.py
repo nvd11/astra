@@ -1,6 +1,6 @@
 """生产环境已部署 API 真实端到端集成测试 (E2E Live Integration Test).
 
-真实针对已部署的线上服务 (https://gw.jppwl.asia/api) 进行端到端全链路验证：
+真实针对已部署的线上服务 (https://gw.jppwl.asia/astra/api) 进行端到端全链路验证：
 1. 记忆能力测试 (多轮上下文回溯与意图保留)
 2. 真实落库验证 (直连 OCI MySQL HeatWave 验证数据物理落盘)
 3. Redis 缓存与治理测试 (直连 Redis 验证限流、停止信号与键 TTL)

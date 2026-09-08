@@ -306,7 +306,7 @@ backend/
   APP_LOGTO_ENDPOINT=https://auth.jppwl.asia
   APP_LOGTO_APP_ID=your-logto-app-id
   APP_LOGTO_APP_SECRET=your-logto-app-secret
-  APP_LOGTO_REDIRECT_URI=https://astra.jppwl.asia/callback
+  APP_LOGTO_REDIRECT_URI=https://gw.jppwl.asia/astra/callback
 
   # ========== 本地开发代理 (仅 local 环境可选) ==========
   # HTTP_PROXY=http://10.0.1.223:7890
@@ -344,7 +344,7 @@ backend/
     - `jwt_access_token_expire_minutes: int = 120`
     - `jwt_refresh_token_expire_days: int = 7`
     - `logto_endpoint: str = "https://auth.jppwl.asia"`
-    - `logto_app_id: str`, `logto_app_secret: str`, `logto_redirect_uri: str = "https://astra.jppwl.asia/callback"`
+    - `logto_app_id: str`, `logto_app_secret: str`, `logto_redirect_uri: str = "https://gw.jppwl.asia/astra/callback"`
   - **日志级别**：`log_level: str = "INFO"`
 
 ---
@@ -770,7 +770,7 @@ Service 层承载纯粹的领域逻辑，屏蔽底层 ORM 细节，与 Router �
 
 ### 10.2 `src/middleware/logging_middleware.py` & `cors_middleware.py`
 - **`logging_middleware.py`**：计算请求耗时，记录请求 URL、方法、状态码至 Loguru，并注入 `X-Request-ID`。
-- **`cors_middleware.py`**：仅允许前端域名 `https://astra.jppwl.asia` 与本地调试源。
+- **`cors_middleware.py`**：仅允许前端来源 `https://gw.jppwl.asia` 与本地调试源 (`http://localhost:5173`, `http://localhost:3000`)。
 
 ### 10.3 `src/utils/validators.py`, `helpers.py`, `formatters.py`
 - **`validators.py`**：提供 `validate_uuid`、`validate_message_length` 等校验函数。
@@ -835,7 +835,7 @@ Service 层承载纯粹的领域逻辑，屏蔽底层 ORM 细节，与 Router �
       # 挂载 CORS 中间件
       app.add_middleware(
           CORSMiddleware,
-          allow_origins=["https://astra.jppwl.asia", "http://localhost:5173"],
+          allow_origins=settings.cors_origins,
           allow_credentials=True,
           allow_methods=["*"],
           allow_headers=["*"],
@@ -1023,7 +1023,7 @@ APP_CLOUDFLARE_AUDIENCE=your-audience-tag
 #### 4. 三种模式行为矩阵
 | 认证模式 | `auth_enabled` | `auth_mode` | 凭据来源与验签方式 | 适用场景 | 前端行为 |
 |---|---|---|---|---|---|
-| **Cloudflare 同域模式（推荐）** | `true` | `cloudflare` | HTTP `CF-Access-Jwt-Assertion`，通过 CF 公开证书验签 | Cloudflare Access 保护的前后端同域反代 (`astra.jppwl.asia`) | **前端无需保存或传输任何 Bearer Token**，Cloudflare Edge 自动注入 Assertion 头，后端自动提取用户身份，杜绝 XSS 盗取 Token |
+| **Cloudflare 同域模式（推荐）** | `true` | `cloudflare` | HTTP `CF-Access-Jwt-Assertion`，通过 CF 公开证书验签 | Cloudflare Access 保护的前后端同域反代 (`gw.jppwl.asia/astra/` 与 `/astra/api`) | **前端无需保存或传输任何 Bearer Token**，Cloudflare Edge 自动注入 Assertion 头，后端自动提取用户身份，杜绝 XSS 盗取 Token |
 | **Logto SSO 独立模式** | `true` | `logto` | HTTP `Authorization: Bearer <JWT>`，通过 Logto JWKS 公钥验签 | 经典跨域部署、独立域名部署 | 前端在 LocalStorage 存储 JWT并在请求头附加 Bearer 令牌，支持 Refresh Token 刷新 |
 | **调试 / 离线模式** | `false` | 任意 / `none` | 无需凭据，直接放行 | 本地极速开发、离线 CI/CD 单元测试 | 所有受保护路由自动注入默认 `anonymous` 匿名用户，`/sessions` 接口优雅返回空列表，免去反复登录 |
 
