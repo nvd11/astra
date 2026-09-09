@@ -160,7 +160,8 @@ class Settings(BaseSettings):
         default=True, description="是否启用认证 (false 时跳过 JWT/Logto 校验)"
     )
     auth_mode: str = Field(
-        default="forward-auth", description="认证模式: forward-auth | logto | cloudflare | none"
+        default="forward-auth",
+        description="认证模式: forward-auth | logto | cloudflare | none",
     )
     cloudflare_team_name: str = Field(
         default="",

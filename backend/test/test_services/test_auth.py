@@ -309,7 +309,9 @@ class TestGetUserFromForwardAuth:
             new_callable=AsyncMock,
         ) as mock_repo_method:
             mock_repo_method.return_value = expected_user
-            user = await _get_user_from_forward_auth(mock_request, mock_settings, db=mock_db)
+            user = await _get_user_from_forward_auth(
+                mock_request, mock_settings, db=mock_db
+            )
 
             assert user is expected_user
             mock_repo_method.assert_called_once_with(
