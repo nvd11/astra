@@ -1287,59 +1287,54 @@ export default api;
 ```
 
 **核心逻辑说明**：
-- `api: AxiosInstance`：全局 Axios 实例，配置 baseURL 和超时
-- 请求拦截器：自动从 localStorage 读取 JWT 并附加到 Authorization Header
-- 响应拦截器：捕获 401 错误，自动使用 Refresh Token 刷新 Access Token
-- `isRefreshing` 标志 + `failedQueue` 队列：防止并发请求时重复刷新 Token
-- 刷新失败时清除本地凭证并跳转登录页
-- **Cloudflare 同域 Zero Trust / 后端 Auth 开关适配**：
-  - 当项目以后端 `APP_AUTH_MODE=cloudflare`（如部署在 `astra.jppwl.asia` 同域）部署时，Cloudflare Edge 自动注入 `CF-Access-Jwt-Assertion` 头，**前端无需在请求拦截器中手动携带 Bearer Token**，且在没有本地 JWT 时不强制重定向至 `/login`，直接复用 Cloudflare Access 提供的企业级单点登录；
-  - 当后端 `APP_AUTH_ENABLED=false`（本地离线研发或内网测试）时，后端自动注入默认匿名用户身份，前端所有 API 调用免登录直接放行。
+- `api: AxiosInstance`：全局 Axios 实例，配置 baseURL (`/astra/api`) 和超时
+- **Kong Forward-Auth Zero-Trust SSO 原生集成**：
+  - 在生产环境中，前端与后端统一受 Kong Ingress 的 `oauth2-forward-auth` 插件守护，单点登录凭据以根域 Cookie `_oauth2_proxy` 存在于 `.jppwl.asia`；
+  - 浏览器原生请求自动携带该 Cookie，**前端无需在 localStorage 存储任何 Token**，杜绝 XSS 泄露风险；
+  - 响应拦截器：当捕获到 401 Unauthorized（代表会话失效或未授权）时，平滑重定向至 `/oauth2/start?rd=/astra/` 发起静默重登；
+  - 当后端处于 `APP_AUTH_ENABLED=false`（本地离线研发或内网测试）时，后端自动注入默认匿名用户身份，前端所有 API 调用免登录直接放行。
 
 ---
 
 ### 6.2 `frontend/src/services/auth.ts`
 
-**功能描述**：认证相关 API 服务。
+**功能描述**：认证相关 API 服务。支持 Kong 网关 Forward-Auth 模式与应用级直连模式。
 
 **核心函数**：
 
 ```typescript
 import api from './api';
 import { API_ENDPOINTS } from '@/utils/constants';
-import { LoginRequest, LoginResponse, LogtoCallbackRequest, UserProfile } from '@/types';
+import { LoginRequest, LoginResponse, UserProfile } from '@/types';
 
+/** 获取当前网关认证用户信息 */
+export async function getCurrentUser(): Promise<UserProfile> {
+  const response = await api.get<{ data: UserProfile }>(API_ENDPOINTS.AUTH.ME);
+  return response.data.data;
+}
+
+/** Kong 网关级登出：重定向至 OAuth2-Proxy 清除根域 Cookie */
+export function gatewayLogout(): void {
+  window.location.href = '/oauth2/sign_out?rd=/astra/';
+}
+
+/** 触发 Kong 网关登录重定向 */
+export function gatewayLogin(): void {
+  window.location.href = `/oauth2/start?rd=${encodeURIComponent(window.location.pathname)}`;
+}
+
+/** 账密登录 (仅本地/开发模式备用) */
 export async function login(data: LoginRequest): Promise<LoginResponse> {
   const response = await api.post<LoginResponse>(API_ENDPOINTS.AUTH.LOGIN, data);
-  return response.data;
-}
-
-export async function logout(): Promise<void> {
-  await api.post(API_ENDPOINTS.AUTH.LOGOUT);
-}
-
-export async function logtoLogin(): Promise<{ redirect_url: string }> {
-  const response = await api.get<{ redirect_url: string }>(API_ENDPOINTS.AUTH.LOGTO_LOGIN);
-  return response.data;
-}
-
-export async function logtoCallback(data: LogtoCallbackRequest): Promise<LoginResponse> {
-  const response = await api.post<LoginResponse>(API_ENDPOINTS.AUTH.LOGTO_CALLBACK, data);
-  return response.data;
-}
-
-export async function getCurrentUser(): Promise<UserProfile> {
-  const response = await api.get<UserProfile>(API_ENDPOINTS.USERS.PROFILE);
   return response.data;
 }
 ```
 
 **函数说明**：
-- `login(data)`：用户名密码登录
-- `logout()`：退出登录，后端将 JWT 加入黑名单
-- `logtoLogin()`：获取 Logto SSO 登录跳转 URL
-- `logtoCallback(data)`：Logto 回调处理，用 code 换取 JWT
-- `getCurrentUser()`：获取当前登录用户信息
+- `getCurrentUser()`：获取当前登录用户信息（基于 Kong 注入的 X-Auth-Request-* 头）
+- `gatewayLogout()`：退出登录，重定向至 OAuth2-Proxy 清除全站 `.jppwl.asia` Cookie
+- `gatewayLogin()`：未登录时引导跳转统一 Logto + GitHub 登录页
+- `login(data)`：用户名密码登录（开发测试备用）
 
 ---
 

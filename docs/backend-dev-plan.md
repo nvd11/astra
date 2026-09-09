@@ -290,20 +290,21 @@ backend/
   APP_JWT_ACCESS_TOKEN_EXPIRE_MINUTES=120
   APP_JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 
-  # ========== 认证开关与多模式部署 (支持 Cloudflare 同域 Zero Trust) ==========
+  # ========== 认证开关与多模式部署 (支持 Kong Forward-Auth 与 Cloudflare Zero Trust) ==========
   # 是否启用认证: true=启用校验, false=完全跳过认证 (开发/单机/内部测试)
   APP_AUTH_ENABLED=true
-  # 认证模式: logto | cloudflare | none
-  # - logto: 使用 Logto SSO (GitHub 账号登录)，基于 Logto JWKS 公钥端点验签，后端无需保存签名私钥
+  # 认证模式: forward-auth | logto | cloudflare | none
+  # - forward-auth (推荐): 复用集群 Kong oauth2-forward-auth 插件与 OAuth2-Proxy (Logto + GitHub SSO)，从 X-Auth-Request-* 头提取用户身份
+  # - logto: 标准 Logto OIDC 独立认证，前端携带 Bearer Token，后端基于 JWKS 端点验签
   # - cloudflare: 使用 Cloudflare Access 同域认证 (自动从 CF-Access-Jwt-Assertion 证书公钥验签)
   # - none: 无认证 (等同于 auth_enabled=false，直接注入 anonymous 用户)
-  APP_AUTH_MODE=logto
+  APP_AUTH_MODE=forward-auth
   # Cloudflare Access 配置 (仅 auth_mode=cloudflare 时生效)
   APP_CLOUDFLARE_TEAM_NAME=your-team-name
   APP_CLOUDFLARE_AUDIENCE=your-audience-tag
 
-  # ========== Logto SSO 统一认证 (GitHub 账号登录) ==========
-  APP_LOGTO_ENDPOINT=https://auth.jppwl.asia
+  # ========== Logto SSO / OAuth 配置 ==========
+  APP_LOGTO_ENDPOINT=https://sodaxw.logto.app
   APP_LOGTO_APP_ID=your-logto-app-id
   APP_LOGTO_APP_SECRET=your-logto-app-secret
   APP_LOGTO_REDIRECT_URI=https://gw.jppwl.asia/astra/callback
@@ -337,7 +338,7 @@ backend/
   - **LLM 私有网关**：`litellm_base_url: str`, `litellm_api_key: str`, `default_model: str = "deepseek-v4-flash"`
   - **认证系统（可插拔多模式 / JWT / Logto / Cloudflare Access）**：
     - `auth_enabled: bool = True`（全局认证开关：若为 `False` 则完全跳过 JWT/Logto 校验并自动注入只读 Mock 匿名用户，专用于本地单元测试、离线开发或单租户内网部署）
-    - `auth_mode: str = "logto"`（认证运行模式：`logto` | `cloudflare` | `none`）
+    - `auth_mode: str = "forward-auth"`（认证运行模式：`forward-auth` | `logto` | `cloudflare` | `none`）
     - `cloudflare_team_name: str = ""`（Cloudflare Access 团队名称）
     - `cloudflare_audience: str = ""`（Cloudflare Access Application AUD 标签）
     - `jwt_secret: str`, `jwt_algorithm: str = "HS256"`
@@ -1012,30 +1013,38 @@ uv run pytest
 # 是否开启认证: true = 强校验; false = 完全跳过认证（单机调试、自动化测试）
 APP_AUTH_ENABLED=true
 
-# 认证模式: logto | cloudflare | none
-# - logto: 标准 Logto OIDC (GitHub SSO 登录)，直接通过 JWKS 公钥端点验签，后端无需保存签名密钥
+# 认证模式: forward-auth | logto | cloudflare | none
+# - forward-auth (生产推荐): 复用集群 Kong oauth2-forward-auth 插件与 OAuth2-Proxy，自动校验 _oauth2_proxy Cookie 并从 X-Auth-Request-* 头提取用户身份
+# - logto: 独立 Logto OIDC 模式，前端携带 Bearer Token，通过 JWKS 公钥验签
 # - cloudflare: Cloudflare Zero Trust 同域认证，自动解析 CF-Access-Jwt-Assertion 公钥验签
 # - none: 完全免认证（等同于 auth_enabled=false，直接注入 anonymous 用户）
-APP_AUTH_MODE=cloudflare
+APP_AUTH_MODE=forward-auth
 
 # Cloudflare Access 配置 (仅 auth_mode=cloudflare 时生效)
 APP_CLOUDFLARE_TEAM_NAME=your-team-name
 APP_CLOUDFLARE_AUDIENCE=your-audience-tag
 ```
 
-#### 4. 三种模式行为矩阵
+#### 4. 认证模式行为矩阵
 | 认证模式 | `auth_enabled` | `auth_mode` | 凭据来源与验签方式 | 适用场景 | 前端行为 |
 |---|---|---|---|---|---|
-| **Cloudflare 同域模式（推荐）** | `true` | `cloudflare` | HTTP `CF-Access-Jwt-Assertion`，通过 CF 公开证书验签 | Cloudflare Access 保护的前后端同域反代 (`gw.jppwl.asia/astra/` 与 `/astra/api`) | **前端无需保存或传输任何 Bearer Token**，Cloudflare Edge 自动注入 Assertion 头，后端自动提取用户身份，杜绝 XSS 盗取 Token |
-| **Logto SSO 独立模式** | `true` | `logto` | HTTP `Authorization: Bearer <JWT>`，通过 Logto JWKS 公钥验签 | 经典跨域部署、独立域名部署 | 前端在 LocalStorage 存储 JWT并在请求头附加 Bearer 令牌，支持 Refresh Token 刷新 |
-| **调试 / 离线模式** | `false` | 任意 / `none` | 无需凭据，直接放行 | 本地极速开发、离线 CI/CD 单元测试 | 所有受保护路由自动注入默认 `anonymous` 匿名用户，`/sessions` 接口优雅返回空列表，免去反复登录 |
+| **Kong 网关 Forward-Auth 模式（推荐）** | `true` | `forward-auth` | Kong 插件校验 `_oauth2_proxy` Cookie 并注入 `X-Auth-Request-User` / `X-Auth-Request-Email` / `X-Auth-Request-Preferred-Username` | 生产环境与 LiteLLM UI、DbGate 统一单点登录 (`gw.jppwl.asia`) | **前端无需保存任何 Token**，浏览器 Cookie 自动随请求携带；登出直接跳转 `/oauth2/sign_out?rd=/astra/` |
+| **Cloudflare 同域模式** | `true` | `cloudflare` | HTTP `CF-Access-Jwt-Assertion`，通过 CF 公开证书验签 | Cloudflare Access 保护的前后端同域反代 (`gw.jppwl.asia/astra/` 与 `/astra/api`) | 前端无需保存 Token，Cloudflare Edge 自动注入 Assertion 头 |
+| **Logto SSO 独立模式** | `true` | `logto` | HTTP `Authorization: Bearer <JWT>`，通过 Logto JWKS 公钥验签 | 经典独立微服务或移动 App 跨域部署 | 前端在 LocalStorage 存储 JWT 并在请求头附加 Bearer 令牌，支持 Refresh Token 刷新 |
+| **调试 / 离线模式** | `false` | 任意 / `none` | 无需凭据，直接放行 | 本地极速开发、离线 CI/CD 单元测试 | 所有受保护路由自动注入默认 `anonymous` 匿名用户，免去反复登录 |
 
 #### 5. 依赖注入透明分发 (`get_current_user`)
 无论在何种模式下，FastAPI 路由只需声明 `current_user: Annotated[User, Depends(get_current_user)]`，依赖注入函数会在底层自动根据配置路由至对应的解析器：
 ```python
-async def get_current_user(request: Request, settings: Settings) -> User:
+async def get_current_user(
+    request: Request,
+    settings: Settings,
+    db: AsyncSession,
+) -> User:
     if not settings.auth_enabled:
         return User(id="anonymous", username="anonymous", ...)
+    if settings.auth_mode == "forward-auth":
+        return await _get_user_from_forward_auth(request, settings, db)
     if settings.auth_mode == "cloudflare":
         return await _get_user_from_cloudflare(request, settings)
     return await _get_user_from_jwt(request, settings)
