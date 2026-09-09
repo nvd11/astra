@@ -103,7 +103,7 @@ class TestConfig:
         assert settings.jwt_algorithm == "HS256"
         assert settings.jwt_access_token_expire_minutes == 120
         assert settings.jwt_refresh_token_expire_days == 7
-        assert settings.logto_endpoint == "https://auth.jppwl.asia"
+        assert settings.logto_endpoint == "https://sodaxw.logto.app"
         assert settings.logto_redirect_uri == "https://astra.jppwl.asia/callback"
 
     def test_settings_from_yaml(self):
