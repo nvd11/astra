@@ -225,6 +225,31 @@ class UserRepository:
             logto_id=logto_id,
         )
 
+    async def get_or_create_by_sso(
+        self,
+        sso_id: str,
+        username: str,
+        email: str | None = None,
+        avatar_url: str | None = None,
+    ) -> User:
+        """根据网关 SSO 信息 (Kong Forward-Auth / Logto / GitHub) 获取或创建用户.
+
+        Args:
+            sso_id: SSO / Logto 唯一身份标识
+            username: 用户名
+            email: 邮箱
+            avatar_url: 头像 URL
+
+        Returns:
+            User: 用户对象
+        """
+        return await self.get_or_create_by_logto(
+            logto_id=sso_id,
+            username=username,
+            email=email,
+            avatar_url=avatar_url,
+        )
+
 
 class SessionRepository:
     """用户会话数据仓库."""
