@@ -94,6 +94,10 @@ async def _get_user_from_forward_auth(
     sso_id = request.headers.get("X-Auth-Request-User") or request.headers.get(
         "x-auth-request-user"
     )
+    logger.warning(
+        f"SSO Forward-Auth debug headers: sso_id={sso_id}, "
+        f"all_headers={dict(request.headers)}"
+    )
     if not sso_id:
         logger.warning("Missing X-Auth-Request-User header in forward-auth mode")
         raise HTTPException(
