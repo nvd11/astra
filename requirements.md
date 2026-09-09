@@ -23,7 +23,7 @@
 - 利用 OCI MySQL HeatWave 原生向量能力，简化架构
 - Redis 缓存加速，容忍穿透，最终一致性
 - **Cloudflare 域名 + Edge SSL 全站 HTTPS**
-- **Logto SSO 统一认证，微信扫码登录**
+- **Logto SSO 统一认证，GitHub 账号登录**
 
 ---
 
@@ -38,7 +38,7 @@
 | P0 | LaTeX 公式渲染 | KaTeX 引擎，行内 `$...$` 与独立 `$$...$$` |
 | P0 | 流式输出 | SSE/WebSocket 打字机效果，支持中断 |
 | P0 | 多轮对话 | 上下文管理，历史消息加载 |
-| P0 | **Logto SSO 登录** | 微信扫码 / OIDC 认证，自动跳转 |
+| P0 | **Logto SSO 登录** | Logto + GitHub 账号登录 / OIDC 认证，自动跳转 |
 | P0 | **多用户界面隔离** | 用户只能看到自己的会话、消息、记忆 |
 | P0 | **Session 管理** | 多设备登录管理、会话过期、强制下线 |
 | P0 | **响应式全端适配** | 自动适配 Mobile (iOS/Android 触控抽屉 Drawer、dvh 视口与虚拟键盘防遮挡) 与 Desktop (PC 宽屏三栏、侧边栏快捷键折叠) |
@@ -398,7 +398,7 @@ async def list_conversations(
 ┌─────────────────────────┐       ┌─────────────────────────────────┐
 │      Logto SSO          │       │      Astra 生产统一网关入口       │
 │   auth.jppwl.asia       │◄─────►│      gw.jppwl.asia              │
-│   微信扫码 / OIDC        │       │  · 前端: /astra/                 │
+│   Logto + GitHub 登录    │       │  · 前端: /astra/                 │
 └─────────────────────────┘       │  · 后端: /astra/api              │
                                   └─────────────────────────────────┘
                                               │
@@ -433,7 +433,7 @@ async def list_conversations(
 | **数据库** | OCI MySQL HeatWave | 26.7.0-cloud | 关系 + 向量一体化 |
 | **缓存** | Redis (K3s) | 7.2-alpine | 热点数据加速 |
 | **ORM** | SQLAlchemy + asyncpg | 2.0+ | 异步 ORM |
-| **认证** | Logto SSO (OIDC) | latest | 微信扫码 / 统一认证 |
+| **认证** | Logto SSO (OIDC) | latest | Logto + GitHub 登录 / 统一认证 |
 | **部署** | ArgoCD + K3s | - | GitOps 持续交付 |
 | **CDN/SSL** | Cloudflare | - | Edge SSL + 全球加速 |
 
@@ -615,7 +615,7 @@ Redis 故障流程：
 | 层级 | 方案 | 说明 |
 |------|------|------|
 | **边缘层** | Cloudflare Edge SSL + CDN | 全站 HTTPS，DDoS 防护，全球加速 |
-| **认证层** | Logto SSO (OIDC) + FastAPI `Depends(get_current_user)` | 微信扫码 / OIDC 认证，JWT 解析提取 `user_id` |
+| **认证层** | Logto SSO (OIDC) + FastAPI `Depends(get_current_user)` | Logto + GitHub 登录 / OIDC 认证，JWT 解析提取 `user_id` |
 | **API 路由** | 路径参数或请求头携带 `user_id` | `/api/v1/users/{user_id}/chat` |
 | **数据库** | `user_id` 外键 + 行级隔离 | 所有表带 `user_id`，查询强制过滤 |
 | **Redis** | Key 前缀 `user:{user_id}:*` | 短期记忆、会话缓存隔离 |
@@ -630,7 +630,7 @@ Redis 故障流程：
     ↓
 未认证 → 重定向至 auth.jppwl.asia (Logto)
     ↓
-微信扫码 / 账号密码登录
+Logto + GitHub / 账号密码登录
     ↓
 Logto 回调 gw.jppwl.asia/astra/callback 携带 code
     ↓

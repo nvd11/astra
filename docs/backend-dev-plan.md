@@ -97,7 +97,7 @@ backend/
 │   │
 │   ├── services/               # 领域业务服务层
 │   │   ├── __init__.py
-│   │   ├── auth_service.py     # 登录认证与 Logto OIDC 微信扫码对接
+│   │   ├── auth_service.py     # 登录认证与 Logto OIDC (GitHub SSO) 对接
 │   │   ├── chat_service.py     # 对话编排、SSE 打字机组装与 Agent 驱动
 │   │   ├── conversation_service.py # 会话元数据与生命周期
 │   │   ├── message_service.py  # 消息持久化与状态更新
@@ -294,7 +294,7 @@ backend/
   # 是否启用认证: true=启用校验, false=完全跳过认证 (开发/单机/内部测试)
   APP_AUTH_ENABLED=true
   # 认证模式: logto | cloudflare | none
-  # - logto: 使用 Logto SSO 微信扫码，基于 Logto JWKS 公钥端点验签，后端无需保存签名私钥
+  # - logto: 使用 Logto SSO (GitHub 账号登录)，基于 Logto JWKS 公钥端点验签，后端无需保存签名私钥
   # - cloudflare: 使用 Cloudflare Access 同域认证 (自动从 CF-Access-Jwt-Assertion 证书公钥验签)
   # - none: 无认证 (等同于 auth_enabled=false，直接注入 anonymous 用户)
   APP_AUTH_MODE=logto
@@ -302,7 +302,7 @@ backend/
   APP_CLOUDFLARE_TEAM_NAME=your-team-name
   APP_CLOUDFLARE_AUDIENCE=your-audience-tag
 
-  # ========== Logto SSO 统一认证 (微信扫码) ==========
+  # ========== Logto SSO 统一认证 (GitHub 账号登录) ==========
   APP_LOGTO_ENDPOINT=https://auth.jppwl.asia
   APP_LOGTO_APP_ID=your-logto-app-id
   APP_LOGTO_APP_SECRET=your-logto-app-secret
@@ -414,7 +414,7 @@ backend/
 |---|---|---|
 | `LoginRequest` | `username: str`, `password: str` | 基础账密登录 |
 | `RefreshTokenRequest` | `refresh_token: str` | 刷新 Access Token |
-| `LogtoCallbackRequest` | `code: str`, `state: str` | Logto SSO 微信登录授权码兑换 |
+| `LogtoCallbackRequest` | `code: str`, `state: str` | Logto SSO (GitHub 登录) 授权码兑换 |
 | `CreateConversationRequest` | `title: str \| None = "新对话"`, `model: str \| None = None`, `agent_preference: str = "auto"`, `system_prompt: str \| None = None` | 创建会话，标题超 255 字符自动截断 |
 | `UpdateConversationRequest` | `title: str \| None = None`, `model: str \| None = None`, `agent_preference: str \| None = None`, `system_prompt: str \| None = None`, `is_archived: bool \| None = None` | 修改会话配置 |
 | `SendMessageRequest` | `conversation_id: str`, `content: str`, `agent_override: str \| None = None`, `model_override: str \| None = None`, `stream: bool = True` | 发送对话消息，正文限制 1~10000 字符 |
@@ -515,7 +515,7 @@ Service 层承载纯粹的领域逻辑，屏蔽底层 ORM 细节，与 Router �
 
 ### 6.1 `src/services/auth_service.py`
 - **文件路径**：`src/services/auth_service.py`
-- **功能描述**：负责常规密码登录校验、Logto OIDC 微信扫码凭据兑换、JWT 令牌签发及用户信息同步。
+- **功能描述**：负责常规密码登录校验、Logto OIDC (GitHub SSO) 凭据兑换、JWT 令牌签发及用户信息同步。
 - **核心函数列表**：
 
 | 函数名 | 签名 | 逻辑说明 |
@@ -988,7 +988,7 @@ uv run pytest
 
 #### 1. 核心安全机制解耦（告别后端保存对称密钥）
 - **Logto 签发与校验机制**：
-  - 用户微信扫码登录后，Token 是由 Logto 统一身份认证中心（IdP）使用其自身的非对称私钥（RS256）签发的；
+  - 用户 GitHub 授权登录后，Token 是由 Logto 统一身份认证中心（IdP）使用其自身的非对称私钥（RS256）签发的；
   - Astra 后端只需拉取 Logto 的公开证书集合 **JWKS (JSON Web Key Set)**（端点：`https://auth.jppwl.asia/oidc/jwks`），即可在内存中利用**公钥**无状态验签，零网络开销且从根本上杜绝私钥泄漏风险；
 - **Cloudflare Access 签发与校验机制**：
   - 在 Cloudflare 同域模式下，Edge 注入的 `CF-Access-Jwt-Assertion` 头直接通过 Cloudflare 的官方公共证书端点 (`https://<team>.cloudflareaccess.com/cdn-cgi/access/certs`) 校验，同样无需后端存储任何加解密密钥；
@@ -1013,7 +1013,7 @@ uv run pytest
 APP_AUTH_ENABLED=true
 
 # 认证模式: logto | cloudflare | none
-# - logto: 标准 Logto OIDC 微信扫码，直接通过 JWKS 公钥端点验签，后端无需保存签名密钥
+# - logto: 标准 Logto OIDC (GitHub SSO 登录)，直接通过 JWKS 公钥端点验签，后端无需保存签名密钥
 # - cloudflare: Cloudflare Zero Trust 同域认证，自动解析 CF-Access-Jwt-Assertion 公钥验签
 # - none: 完全免认证（等同于 auth_enabled=false，直接注入 anonymous 用户）
 APP_AUTH_MODE=cloudflare
