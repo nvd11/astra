@@ -155,12 +155,12 @@ class Settings(BaseSettings):
         default=7, description="Refresh Token 过期时间 (天)"
     )
 
-    # ========== 认证开关 (支持 Cloudflare 同域部署) ==========
+    # ========== 认证开关 (支持 Cloudflare 同域部署与 Kong Forward-Auth) ==========
     auth_enabled: bool = Field(
         default=True, description="是否启用认证 (false 时跳过 JWT/Logto 校验)"
     )
     auth_mode: str = Field(
-        default="logto", description="认证模式: logto | cloudflare | none"
+        default="forward-auth", description="认证模式: forward-auth | logto | cloudflare | none"
     )
     cloudflare_team_name: str = Field(
         default="",
@@ -194,7 +194,7 @@ class Settings(BaseSettings):
     @classmethod
     def validate_auth_mode(cls, v: str) -> str:
         """校验认证模式."""
-        valid_modes = {"logto", "cloudflare", "none"}
+        valid_modes = {"forward-auth", "logto", "cloudflare", "none"}
         v = v.lower()
         if v not in valid_modes:
             raise ValueError(f"Auth mode must be one of {valid_modes}")

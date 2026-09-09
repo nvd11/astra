@@ -8,26 +8,31 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.configs.config import Settings, get_settings
-from src.models.user import User
+from src.engine.mysql_client import get_db_session
+from src.models.user import User, UserRepository
 from src.utils.jwt import get_jwt_manager
 
 
 async def get_current_user(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
+    db: Annotated[AsyncSession | None, Depends(get_db_session)] = None,
 ) -> User:
     """获取当前认证用户 (依赖注入).
 
     根据配置自动选择认证模式:
     - auth_enabled=False: 返回匿名用户 (用于开发/测试)
+    - auth_mode=forward-auth: 从 Kong oauth2-forward-auth 注入的 X-Auth-Request-* Header 解析并自动落库
     - auth_mode=cloudflare: 从 CF-Access-Jwt-Assertion Header 解析
     - auth_mode=logto: 从 Authorization Bearer Token 解析
 
     Args:
         request: FastAPI Request 对象
         settings: 应用配置
+        db: 数据库异步会话 (可选注入)
 
     Returns:
         User: 当前用户对象
@@ -49,12 +54,88 @@ async def get_current_user(
             logto_id=None,
         )
 
+    # Kong Forward-Auth 网关鉴权模式 (生产推荐)
+    if settings.auth_mode == "forward-auth":
+        return await _get_user_from_forward_auth(request, settings, db)
+
     # Cloudflare Access 同域认证模式
     if settings.auth_mode == "cloudflare":
         return await _get_user_from_cloudflare(request, settings)
 
     # Logto / JWT Bearer Token 认证模式
     return await _get_user_from_jwt(request, settings)
+
+
+async def _get_user_from_forward_auth(
+    request: Request,
+    settings: Settings,
+    db: AsyncSession | None = None,
+) -> User:
+    """从 Kong Forward-Auth 注入的请求头中解析用户.
+
+    Kong Lua 插件 oauth2-forward-auth 在校验通过后会注入:
+    - X-Auth-Request-User: Logto sub / 用户唯一身份锚点
+    - X-Auth-Request-Preferred-Username: GitHub 登录用户名
+    - X-Auth-Request-Email: 用户邮箱
+
+    Args:
+        request: FastAPI Request 对象
+        settings: 应用配置
+        db: 数据库异步会话 (用于自动落库或查询)
+
+    Returns:
+        User: 用户对象
+
+    Raises:
+        HTTPException: 缺少网关注入身份头时抛出 401
+    """
+    sso_id = request.headers.get("X-Auth-Request-User") or request.headers.get(
+        "x-auth-request-user"
+    )
+    if not sso_id:
+        logger.warning("Missing X-Auth-Request-User header in forward-auth mode")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing SSO identity headers (X-Auth-Request-User)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    username = (
+        request.headers.get("X-Auth-Request-Preferred-Username")
+        or request.headers.get("x-auth-request-preferred-username")
+        or sso_id
+    )
+    email = request.headers.get("X-Auth-Request-Email") or request.headers.get(
+        "x-auth-request-email"
+    )
+    avatar_url = (
+        f"https://github.com/{username}.png"
+        if username and username != "github-user"
+        else None
+    )
+
+    # 若注入了数据库异步会话，自动完成持久化同步并返回数据库 User 实体
+    if db is not None:
+        user_repo = UserRepository(db)
+        user = await user_repo.get_or_create_by_sso(
+            sso_id=sso_id,
+            username=username,
+            email=email,
+            avatar_url=avatar_url,
+        )
+        return user
+
+    # 无 DB 会话环境 (如独立轻量单元测试) 兜底构造 User 对象
+    return User(
+        id=sso_id,
+        username=username,
+        email=email,
+        avatar_url=avatar_url,
+        preferences={},
+        default_model=settings.default_model,
+        default_agent="auto",
+        logto_id=sso_id,
+    )
 
 
 async def _get_user_from_jwt(request: Request, settings: Settings) -> User:
@@ -185,6 +266,7 @@ async def get_current_active_user(
 async def get_optional_user(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
+    db: Annotated[AsyncSession | None, Depends(get_db_session)] = None,
 ) -> User | None:
     """获取可选当前用户 (依赖注入).
 
@@ -193,11 +275,12 @@ async def get_optional_user(
     Args:
         request: FastAPI Request 对象
         settings: 应用配置
+        db: 数据库异步会话 (可选注入)
 
     Returns:
         User | None: 用户对象或 None
     """
     try:
-        return await get_current_user(request, settings)
+        return await get_current_user(request, settings, db)
     except HTTPException:
         return None

@@ -1,24 +1,10 @@
-import axios from 'axios';
 import {
   BaseResponse,
   Conversation,
   Message,
   PaginatedData,
 } from '@/types';
-import { storage } from '@/utils/storage';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/astra/api';
-
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'X-Session-ID': storage.getSessionId(),
-  };
-  const token = storage.getToken();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-}
+import { api } from './api';
 
 export const conversationService = {
   /**
@@ -30,15 +16,14 @@ export const conversationService = {
     isArchived = false
   ): Promise<PaginatedData<Conversation>> {
     try {
-      const response = await axios.get<
+      const response = await api.get<
         BaseResponse<PaginatedData<Conversation>>
-      >(`${API_BASE_URL}/conversations`, {
+      >('/conversations', {
         params: {
           page,
           page_size: pageSize,
           is_archived: isArchived,
         },
-        headers: getAuthHeaders(),
       });
       if (response.data && response.data.code === 0) {
         return response.data.data;
@@ -55,9 +40,8 @@ export const conversationService = {
    */
   async getConversation(id: string): Promise<Conversation | null> {
     try {
-      const response = await axios.get<BaseResponse<Conversation>>(
-        `${API_BASE_URL}/conversations/${id}`,
-        { headers: getAuthHeaders() }
+      const response = await api.get<BaseResponse<Conversation>>(
+        `/conversations/${id}`
       );
       if (response.data && response.data.code === 0) {
         return response.data.data;
@@ -82,10 +66,9 @@ export const conversationService = {
     }
   ): Promise<Conversation | null> {
     try {
-      const response = await axios.put<BaseResponse<Conversation>>(
-        `${API_BASE_URL}/conversations/${id}`,
-        data,
-        { headers: getAuthHeaders() }
+      const response = await api.put<BaseResponse<Conversation>>(
+        `/conversations/${id}`,
+        data
       );
       if (response.data && response.data.code === 0) {
         return response.data.data;
@@ -102,9 +85,8 @@ export const conversationService = {
    */
   async deleteConversation(id: string): Promise<boolean> {
     try {
-      const response = await axios.delete<BaseResponse<{ deleted: boolean }>>(
-        `${API_BASE_URL}/conversations/${id}`,
-        { headers: getAuthHeaders() }
+      const response = await api.delete<BaseResponse<{ deleted: boolean }>>(
+        `/conversations/${id}`
       );
       return response.data && response.data.code === 0;
     } catch (err) {
@@ -122,11 +104,10 @@ export const conversationService = {
     pageSize = 100
   ): Promise<Message[]> {
     try {
-      const response = await axios.get<BaseResponse<PaginatedData<Message>>>(
-        `${API_BASE_URL}/conversations/${conversationId}/messages`,
+      const response = await api.get<BaseResponse<PaginatedData<Message>>>(
+        `/conversations/${conversationId}/messages`,
         {
           params: { page, page_size: pageSize },
-          headers: getAuthHeaders(),
         }
       );
       if (response.data && response.data.code === 0 && response.data.data) {

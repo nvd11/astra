@@ -328,19 +328,19 @@ async def refresh_token(
     "/logout",
     response_model=BaseResponse[dict[str, Any]],
     summary="登出",
-    description="登出并删除当前会话",
+    description="登出并删除当前会话 (支持 Forward-Auth 清理与 Token 删除)",
 )
 async def logout(
-    request: RefreshTokenRequest,
     settings: Annotated[Settings, Depends(get_settings)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    request: RefreshTokenRequest | None = None,
 ) -> BaseResponse[dict[str, Any]]:
     """登出端点.
 
     Args:
-        request: 包含 Refresh Token 的请求
         settings: 应用配置
         db: 数据库会话
+        request: 可选的包含 Refresh Token 的请求
 
     Returns:
         BaseResponse[dict[str, Any]]: 登出结果
@@ -348,10 +348,18 @@ async def logout(
     if not settings.auth_enabled:
         return BaseResponse(data={"message": "Auth disabled, no session to logout"})
 
-    session_repo = SessionRepository(db)
-    deleted = await session_repo.delete_by_refresh_token(request.refresh_token)
+    deleted = False
+    if request and request.refresh_token:
+        session_repo = SessionRepository(db)
+        deleted = await session_repo.delete_by_refresh_token(request.refresh_token)
 
-    return BaseResponse(data={"message": "Logged out successfully", "deleted": deleted})
+    return BaseResponse(
+        data={
+            "message": "Logged out successfully",
+            "deleted": deleted,
+            "signout_url": "/oauth2/sign_out?rd=/astra/",
+        }
+    )
 
 
 @router.get(

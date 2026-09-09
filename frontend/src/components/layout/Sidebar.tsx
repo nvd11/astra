@@ -11,8 +11,11 @@ import {
   X,
   Search,
   Loader2,
+  LogOut,
+  LogIn,
 } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
+import { useAuthStore } from '@/stores/authStore';
 import { Conversation } from '@/types';
 import { cn } from '@/utils/cn';
 
@@ -78,10 +81,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
-  // 挂载时拉取真实会话列表
+  const { user, fetchCurrentUser, logout, login } = useAuthStore();
+
+  // 挂载时拉取真实用户信息与会话列表
   useEffect(() => {
+    fetchCurrentUser();
     fetchConversations();
-  }, [fetchConversations]);
+  }, [fetchCurrentUser, fetchConversations]);
 
   const handleSelectConversation = (id: string) => {
     selectConversation(id);
@@ -298,8 +304,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* 底部设置入口 */}
-      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800/80">
+      {/* 底部设置与用户身份区 */}
+      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800/80 flex flex-col gap-2">
         <button
           onClick={() => onSelectTab && onSelectTab('settings')}
           className={cn(
@@ -312,6 +318,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Settings className="w-4 h-4" />
           <span>设置与设备管理</span>
         </button>
+
+        {user && user.id !== 'anonymous' ? (
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-zinc-100/90 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800">
+            <div className="flex items-center gap-2 truncate min-w-0">
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.username}
+                  className="w-7 h-7 rounded-full object-cover border border-zinc-300 dark:border-zinc-700 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                  {user.username.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div className="flex flex-col truncate">
+                <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate leading-tight">
+                  {user.username}
+                </span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate leading-tight mt-0.5">
+                  {user.email || 'GitHub 认证'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={logout}
+              className="p-1.5 text-zinc-400 hover:text-red-500 dark:hover:text-red-400 rounded-md hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors flex-shrink-0 ml-1"
+              title="退出登录 (注销全站 Cookie)"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={login}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>使用 GitHub 登录</span>
+          </button>
+        )}
       </div>
     </aside>
   );

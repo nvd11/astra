@@ -1,7 +1,8 @@
 import React from 'react';
-import { Menu, PanelLeftClose, PanelLeft, Moon, Sun, Sparkles } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeft, Moon, Sun, Sparkles, LogIn } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { useAuthStore } from '@/stores/authStore';
 
 export const Header: React.FC = () => {
   const {
@@ -12,6 +13,7 @@ export const Header: React.FC = () => {
     availableModels,
   } = useChatStore();
   const { theme, toggleTheme } = useThemeStore();
+  const { user, login } = useAuthStore();
 
   const modelInfo =
     availableModels.find((m) => m.id === currentModel) || {
@@ -68,10 +70,33 @@ export const Header: React.FC = () => {
           )}
         </button>
 
-        {/* 用户头像占位 */}
-        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center text-white text-xs font-semibold shadow-sm">
-          A
-        </div>
+        {/* 用户头像或登录入口 */}
+        {user && user.id !== 'anonymous' ? (
+          <div
+            className="flex items-center gap-1.5"
+            title={`${user.username} (${user.email || 'GitHub 登录'})`}
+          >
+            {user.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.username}
+                className="w-8 h-8 rounded-full object-cover border border-zinc-200 dark:border-zinc-700 shadow-sm"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-500 to-indigo-500 flex items-center justify-center text-white text-xs font-semibold shadow-sm">
+                {user.username.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={login}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors shadow-sm"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>登录</span>
+          </button>
+        )}
       </div>
     </header>
   );

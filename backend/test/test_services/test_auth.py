@@ -7,6 +7,7 @@ from fastapi import HTTPException, Request
 
 from src.services.auth import (
     _get_user_from_cloudflare,
+    _get_user_from_forward_auth,
     _get_user_from_jwt,
     get_current_active_user,
     get_current_user,
@@ -62,6 +63,22 @@ class TestGetCurrentUser:
             user = await get_current_user(mock_request, mock_settings)
             assert user is not None
             mock_jwt.assert_called_once_with(mock_request, mock_settings)
+
+    @pytest.mark.asyncio
+    async def test_auth_mode_forward_auth(self):
+        """测试 Kong Forward-Auth 认证模式."""
+        mock_request = MagicMock(spec=Request)
+        mock_settings = MagicMock()
+        mock_settings.auth_enabled = True
+        mock_settings.auth_mode = "forward-auth"
+
+        with patch(
+            "src.services.auth._get_user_from_forward_auth", new_callable=AsyncMock
+        ) as mock_fwd:
+            mock_fwd.return_value = MagicMock()
+            user = await get_current_user(mock_request, mock_settings)
+            assert user is not None
+            mock_fwd.assert_called_once_with(mock_request, mock_settings, None)
 
 
 class TestGetUserFromJWT:
@@ -232,3 +249,72 @@ class TestGetOptionalUser:
             mock_get_user.side_effect = HTTPException(status_code=401)
             result = await get_optional_user(mock_request, mock_settings)
             assert result is None
+
+
+class TestGetUserFromForwardAuth:
+    """_get_user_from_forward_auth 测试类."""
+
+    @pytest.mark.asyncio
+    async def test_missing_user_header(self):
+        """测试缺失 X-Auth-Request-User 头时抛出 401."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.headers = {}
+        mock_settings = MagicMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await _get_user_from_forward_auth(mock_request, mock_settings)
+
+        assert exc_info.value.status_code == 401
+        assert "Missing SSO identity headers" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_valid_headers_without_db(self):
+        """测试无 DB 会话时直接根据请求头构造 User 对象."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.headers = {
+            "X-Auth-Request-User": "usr_test123",
+            "X-Auth-Request-Preferred-Username": "nvd11",
+            "X-Auth-Request-Email": "nvd11@example.com",
+        }
+        mock_settings = MagicMock()
+        mock_settings.default_model = "gemini-3.8-flash"
+
+        user = await _get_user_from_forward_auth(mock_request, mock_settings, db=None)
+
+        assert user.id == "usr_test123"
+        assert user.username == "nvd11"
+        assert user.email == "nvd11@example.com"
+        assert user.avatar_url == "https://github.com/nvd11.png"
+        assert user.logto_id == "usr_test123"
+        assert user.default_model == "gemini-3.8-flash"
+
+    @pytest.mark.asyncio
+    async def test_valid_headers_with_db(self):
+        """测试有 DB 会话时调用 UserRepository.get_or_create_by_sso 同步落库."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.headers = {
+            "X-Auth-Request-User": "usr_db_test",
+            "X-Auth-Request-Preferred-Username": "developer_jason",
+            "X-Auth-Request-Email": "jason@hsbc.com",
+        }
+        mock_settings = MagicMock()
+        mock_db = AsyncMock()
+
+        expected_user = MagicMock()
+        expected_user.id = "uuid-persisted-in-mysql"
+        expected_user.username = "developer_jason"
+
+        with patch(
+            "src.services.auth.UserRepository.get_or_create_by_sso",
+            new_callable=AsyncMock,
+        ) as mock_repo_method:
+            mock_repo_method.return_value = expected_user
+            user = await _get_user_from_forward_auth(mock_request, mock_settings, db=mock_db)
+
+            assert user is expected_user
+            mock_repo_method.assert_called_once_with(
+                sso_id="usr_db_test",
+                username="developer_jason",
+                email="jason@hsbc.com",
+                avatar_url="https://github.com/developer_jason.png",
+            )
