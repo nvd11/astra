@@ -50,7 +50,7 @@ class UserInfoData(BaseModel):
     )
     default_model: str = Field(default="deepseek-v4-flash", description="默认模型")
     default_agent: str = Field(default="auto", description="默认 Agent")
-    created_at: datetime = Field(description="创建时间")
+    created_at: datetime | None = Field(default=None, description="创建时间")
 
 
 class TokenResponseData(BaseModel):

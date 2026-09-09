@@ -4,6 +4,7 @@
 支持认证开关，便于 Cloudflare 同域部署时绕过认证.
 """
 
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -52,6 +53,7 @@ async def get_current_user(
             default_model=settings.default_model,
             default_agent="auto",
             logto_id=None,
+            created_at=datetime.now(UTC),
         )
 
     # Kong Forward-Auth 网关鉴权模式 (生产推荐)
@@ -135,6 +137,7 @@ async def _get_user_from_forward_auth(
         default_model=settings.default_model,
         default_agent="auto",
         logto_id=sso_id,
+        created_at=datetime.now(UTC),
     )
 
 
@@ -183,6 +186,7 @@ async def _get_user_from_jwt(request: Request, settings: Settings) -> User:
         default_model=payload.get("default_model", settings.default_model),
         default_agent=payload.get("default_agent", "auto"),
         logto_id=payload.get("logto_id"),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -239,6 +243,7 @@ async def _get_user_from_cloudflare(request: Request, settings: Settings) -> Use
             default_model=settings.default_model,
             default_agent="auto",
             logto_id=None,
+            created_at=datetime.now(UTC),
         )
     except Exception as e:
         logger.error(f"Failed to parse Cloudflare JWT: {e}")
