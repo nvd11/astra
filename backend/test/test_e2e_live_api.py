@@ -515,6 +515,7 @@ class TestLiveAPIE2E:
         db_conn: asyncmy.Connection,
     ):
         """测试 9: 传入库中未注册的脏 X-Session-ID，验证后端外键优雅降级为 NULL，不崩不报 500."""
+        await asyncio.sleep(1)
         unregistered_uuid = str(uuid.uuid4())
 
         # 1. 确认该 UUID 绝对不存在于 user_sessions 表中
