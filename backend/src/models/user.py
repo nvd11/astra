@@ -201,13 +201,17 @@ class UserRepository:
         """
         user = await self.get_by_logto_id(logto_id)
         if user:
-            # 更新最新信息
-            await self.update(
-                user.id,
-                username=username,
-                email=email,
-                avatar_url=avatar_url,
-            )
+            # 仅当传入更具体的有效信息时才更新，防止已存在的友好昵称被原始 logto_id 覆盖
+            update_data: dict[str, Any] = {}
+            if username and username != logto_id:
+                update_data["username"] = username
+            if email and email != logto_id:
+                update_data["email"] = email
+            if avatar_url and logto_id not in avatar_url:
+                update_data["avatar_url"] = avatar_url
+
+            if update_data:
+                await self.update(user.id, **update_data)
             return user
 
         # 检查用户名是否已存在

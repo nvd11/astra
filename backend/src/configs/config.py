@@ -173,7 +173,7 @@ class Settings(BaseSettings):
 
     # ========== Logto SSO 统一认证 ==========
     logto_endpoint: str = Field(
-        default="https://auth.jppwl.asia", description="Logto SSO 端点"
+        default="https://sodaxw.logto.app", description="Logto SSO 端点"
     )
     logto_app_id: str = Field(default="", description="Logto 应用 ID")
     logto_app_secret: str = Field(default="", description="Logto 应用密钥")
