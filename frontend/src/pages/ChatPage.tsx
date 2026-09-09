@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Sparkles, User as UserIcon, ArrowDown, Cpu } from 'lucide-react';
+import { Sparkles, User as UserIcon, ArrowDown, Cpu, Loader2 } from 'lucide-react';
 import { EmptyState } from '@/components/chat/EmptyState';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
@@ -24,6 +24,7 @@ export const ChatPage: React.FC = () => {
     isStreaming,
     setIsStreaming,
     setAbortController,
+    isLoadingMessages,
   } = useChatStore();
 
   const activeAssistantMsgIdRef = useRef<string | null>(null);
@@ -156,7 +157,12 @@ export const ChatPage: React.FC = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-50/50 dark:bg-zinc-950 relative">
       {/* 消息滚动流容器 (绑定 autoScroll ref) */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
-        {messages.length === 0 ? (
+        {isLoadingMessages ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-xs text-zinc-400">
+            <Loader2 className="w-4 h-4 animate-spin text-sky-500" />
+            <span>正在加载历史对话记录...</span>
+          </div>
+        ) : messages.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="max-w-4xl xl:max-w-5xl mx-auto space-y-6">

@@ -1,12 +1,16 @@
 import { create } from 'zustand';
 import { Conversation, Message, AgentType, ModelInfo, AgentInfo } from '@/types';
 import { chatService } from '@/services/chat';
+import { conversationService } from '@/services/conversations';
 
 interface ChatStore {
   // 会话与消息列表
   conversations: Conversation[];
   activeConversationId: string | null;
   messages: Message[];
+  isLoadingConversations: boolean;
+  isLoadingMessages: boolean;
+  searchQuery: string;
 
   // 动态模型发现列表 (由 LiteLLM 网关实时同步，严禁 Hardcode)
   availableModels: ModelInfo[];
@@ -38,6 +42,7 @@ interface ChatStore {
   setInputPrompt: (prompt: string) => void;
   setIsStreaming: (isStreaming: boolean) => void;
   setAbortController: (controller: AbortController | null) => void;
+  setSearchQuery: (query: string) => void;
   stopStreaming: () => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
@@ -46,12 +51,19 @@ interface ChatStore {
   startNewChat: () => void;
   fetchModels: () => Promise<void>;
   fetchAgents: () => Promise<void>;
+  fetchConversations: () => Promise<void>;
+  selectConversation: (id: string) => Promise<void>;
+  updateConversationTitle: (id: string, title: string) => Promise<void>;
+  deleteConversationById: (id: string) => Promise<void>;
 }
 
 export const useChatStore = create<ChatStore>((set, get) => ({
   conversations: [],
   activeConversationId: null,
   messages: [],
+  isLoadingConversations: false,
+  isLoadingMessages: false,
+  searchQuery: '',
 
   // 动态模型与智能体初始列表
   availableModels: [],
@@ -69,6 +81,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   isMobileDrawerOpen: false,
 
   setAbortController: (abortController) => set({ abortController }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
 
   stopStreaming: () => {
     const state = get();
@@ -115,6 +128,55 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     } else {
       set({ isLoadingAgents: false });
     }
+  },
+
+  fetchConversations: async () => {
+    set({ isLoadingConversations: true });
+    const data = await conversationService.listConversations(1, 100);
+    set({
+      conversations: data.items,
+      isLoadingConversations: false,
+    });
+  },
+
+  selectConversation: async (id: string) => {
+    const state = get();
+    const conv = state.conversations.find((c) => c.id === id);
+    if (!conv) return;
+
+    set({
+      activeConversationId: id,
+      currentModel: conv.model || state.currentModel,
+      currentAgent: (conv.agent_preference as AgentType) || state.currentAgent,
+      isLoadingMessages: true,
+    });
+
+    const messages = await conversationService.listMessages(id, 1, 100);
+    set({
+      messages,
+      isLoadingMessages: false,
+    });
+  },
+
+  updateConversationTitle: async (id: string, title: string) => {
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === id ? { ...c, title } : c
+      ),
+    }));
+    await conversationService.updateConversation(id, { title });
+  },
+
+  deleteConversationById: async (id: string) => {
+    const state = get();
+    const remaining = state.conversations.filter((c) => c.id !== id);
+    set({ conversations: remaining });
+
+    if (state.activeConversationId === id) {
+      state.startNewChat();
+    }
+
+    await conversationService.deleteConversation(id);
   },
 
   setConversations: (conversations) => set({ conversations }),
