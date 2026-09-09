@@ -390,6 +390,6 @@ async def get_me(
             preferences=current_user.preferences,
             default_model=current_user.default_model,
             default_agent=current_user.default_agent,
-            created_at=current_user.created_at,
+            created_at=current_user.created_at or datetime.now(UTC),
         ),
     )
