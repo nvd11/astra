@@ -336,3 +336,43 @@ class TestAuthRouter:
         """测试获取当前用户信息 - 未认证."""
         response = client.get("/auth/me")
         assert response.status_code == 401
+
+    def test_get_me_forward_auth_real_dependency(self, client: TestClient, app):
+        """测试获取当前用户信息 - 真实 forward-auth 依赖链路 (不 mock get_current_user)."""
+        app.dependency_overrides.clear()
+
+        # 模拟 Settings 为 forward-auth 模式
+        mock_settings = MagicMock(spec=Settings)
+        mock_settings.auth_enabled = True
+        mock_settings.auth_mode = "forward-auth"
+        mock_settings.default_model = "gemini-3.8-flash"
+        app.dependency_overrides[get_settings] = lambda: mock_settings
+
+        mock_repo = AsyncMock()
+        mock_user = User(
+            id="usr_live_test",
+            username="jason_dev",
+            email="jason@hsbc.com",
+            avatar_url="https://github.com/jason_dev.png",
+            preferences={},
+            default_model="gemini-3.8-flash",
+            default_agent="auto",
+            created_at=datetime.datetime.now(datetime.UTC),
+        )
+        mock_repo.get_or_create_by_sso.return_value = mock_user
+
+        with patch("src.services.auth.UserRepository", return_value=mock_repo):
+            response = client.get(
+                "/auth/me",
+                headers={
+                    "X-Auth-Request-User": "usr_live_test",
+                    "X-Auth-Request-Preferred-Username": "jason_dev",
+                    "X-Auth-Request-Email": "jason@hsbc.com",
+                },
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["code"] == 0
+            assert data["data"]["id"] == "usr_live_test"
+            assert data["data"]["username"] == "jason_dev"
+            assert data["data"]["avatar_url"] == "https://github.com/jason_dev.png"
