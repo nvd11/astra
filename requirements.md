@@ -23,7 +23,7 @@
 - 利用 OCI MySQL HeatWave 原生向量能力，简化架构
 - Redis 缓存加速，容忍穿透，最终一致性
 - **Cloudflare 域名 + Edge SSL 全站 HTTPS**
-- **Logto SSO 统一认证，GitHub 账号登录**
+- **Kong 网关层 Zero-Trust SSO (Logto + GitHub OAuth + OAuth2-Proxy Forward-Auth)**
 
 ---
 
@@ -38,7 +38,7 @@
 | P0 | LaTeX 公式渲染 | KaTeX 引擎，行内 `$...$` 与独立 `$$...$$` |
 | P0 | 流式输出 | SSE/WebSocket 打字机效果，支持中断 |
 | P0 | 多轮对话 | 上下文管理，历史消息加载 |
-| P0 | **Logto SSO 登录** | Logto + GitHub 账号登录 / OIDC 认证，自动跳转 |
+| P0 | **Kong 网关 SSO 登录** | 复用集群统一 Kong Lua `oauth2-forward-auth`，未登录自动重定向 Logto + GitHub OAuth，共享 `.jppwl.asia` 单点登录 |
 | P0 | **多用户界面隔离** | 用户只能看到自己的会话、消息、记忆 |
 | P0 | **Session 管理** | 多设备登录管理、会话过期、强制下线 |
 | P0 | **响应式全端适配** | 自动适配 Mobile (iOS/Android 触控抽屉 Drawer、dvh 视口与虚拟键盘防遮挡) 与 Desktop (PC 宽屏三栏、侧边栏快捷键折叠) |
@@ -60,7 +60,7 @@
 | P0 | Main Agent | 用户 Query 接收、意图识别、任务分发、结果聚合 |
 | P0 | Sub-Agent 集群 | 代码、搜索、分析、创作等专业化子代理 |
 | P0 | 记忆能力 | 短期记忆（会话上下文）+ 长期记忆（用户画像/历史） |
-| P0 | **Logto SSO 集成** | OIDC 认证、JWT 签发、用户同步 |
+| P0 | **Kong 网关 SSO 集成** | 接收 Kong `X-Auth-Request-*` 注入头，自动提取/同步 GitHub 用户、绑定设备会话 |
 | P0 | **多用户数据隔离** | 用户表、会话表、消息表、记忆表全量 `user_id` 行级隔离 |
 | P0 | **多用户缓存隔离** | Redis Key 前缀 `user:{user_id}:*`，Agent 状态独立 |
 | P0 | **Session 管理** | JWT 黑名单、多设备会话追踪、强制下线 |
@@ -396,10 +396,11 @@ async def list_conversations(
               ┌───────────────┴───────────────┐
               ▼                               ▼
 ┌─────────────────────────┐       ┌─────────────────────────────────┐
-│      Logto SSO          │       │      Astra 生产统一网关入口       │
-│   auth.jppwl.asia       │◄─────►│      gw.jppwl.asia              │
+│       Logto IdP         │       │   Kong Gateway (Forward-Auth)   │
+│    sodaxw.logto.app     │◄─────►│      gw.jppwl.asia              │
 │   Logto + GitHub 登录    │       │  · 前端: /astra/                 │
 └─────────────────────────┘       │  · 后端: /astra/api              │
+                                  │  · OAuth2-Proxy: /oauth2/*      │
                                   └─────────────────────────────────┘
                                               │
                                               ▼
@@ -422,18 +423,18 @@ async def list_conversations(
 | 层级 | 技术 | 版本 | 说明 |
 |------|------|------|------|
 | **前端框架** | React + TypeScript | 18+ | 组件化开发 |
-| **UI 组件库** | shadcn/ui / Ant Design | latest | 高质量组件 |
+| **UI 组件库** | shadcn/ui / Tailwind | latest | 高质量组件 |
 | **样式方案** | Tailwind CSS | 3.x | 原子化 CSS |
-| **Markdown 渲染** | react-markdown + remark-gfm + rehype-katex | latest | 完整 GFM + LaTeX |
-| **代码高亮** | highlight.js / prism | latest | 语法高亮 |
-| **构建工具** | Vite | 5.x | 极速冷启动 |
+| **Markdown 渲染** | react-markdown + remark-math + rehype-katex | latest | 完整 GFM + LaTeX |
+| **代码高亮** | PrismJS | latest | 语法高亮 |
+| **构建工具** | Vite | 6.x | 极速冷启动 |
 | **后端框架** | FastAPI | 0.100+ | 异步高性能 |
 | **Agent 框架** | LangGraph / LangChain | latest | 多 Agent 编排 |
 | **LLM 接入** | LiteLLM (OpenAI 兼容) | - | 私有网关 |
 | **数据库** | OCI MySQL HeatWave | 26.7.0-cloud | 关系 + 向量一体化 |
 | **缓存** | Redis (K3s) | 7.2-alpine | 热点数据加速 |
-| **ORM** | SQLAlchemy + asyncpg | 2.0+ | 异步 ORM |
-| **认证** | Logto SSO (OIDC) | latest | Logto + GitHub 登录 / 统一认证 |
+| **ORM** | SQLAlchemy + asyncmy | 2.0+ | 异步 MySQL ORM |
+| **认证** | Kong Forward-Auth + OAuth2-Proxy | latest | Logto + GitHub SSO，单点登录，安全注入身份头 |
 | **部署** | ArgoCD + K3s | - | GitOps 持续交付 |
 | **CDN/SSL** | Cloudflare | - | Edge SSL + 全球加速 |
 
@@ -615,43 +616,50 @@ Redis 故障流程：
 | 层级 | 方案 | 说明 |
 |------|------|------|
 | **边缘层** | Cloudflare Edge SSL + CDN | 全站 HTTPS，DDoS 防护，全球加速 |
-| **认证层** | Logto SSO (OIDC) + FastAPI `Depends(get_current_user)` | Logto + GitHub 登录 / OIDC 认证，JWT 解析提取 `user_id` |
-| **API 路由** | 路径参数或请求头携带 `user_id` | `/api/v1/users/{user_id}/chat` |
+| **认证层** | Kong Forward-Auth (`oauth2-forward-auth`) + FastAPI `Depends(get_current_user)` | 自动校验 `_oauth2_proxy` Cookie，从注入的 `X-Auth-Request-*` 提取 `user_id` 与身份 |
+| **API 路由** | 请求自动绑定网关注入身份 | 全接口依托依赖注入强隔离 |
 | **数据库** | `user_id` 外键 + 行级隔离 | 所有表带 `user_id`，查询强制过滤 |
 | **Redis** | Key 前缀 `user:{user_id}:*` | 短期记忆、会话缓存隔离 |
 | **向量检索** | Metadata 过滤 | `user_id` 作为 metadata 强制过滤 |
 | **Agent 上下文** | 每个请求独立 `AgentState` | 不共享全局状态，防止串话 |
 
-### 6.2 Logto SSO 集成方案
+### 6.2 Kong 网关层 Zero-Trust SSO 集成方案
 
-**认证流程：**
+系统完全复用集群既有的 **Kong Gateway + OAuth2-Proxy + Logto (GitHub OAuth)** 生产级单点登录架构，与 `LiteLLM UI`、`DbGate` 共享 `.jppwl.asia` 根域凭据，实现零信任与无感登录：
+
+**认证流转全时序：**
 ```
-用户访问 gw.jppwl.asia/astra/
+浏览器访问 https://gw.jppwl.asia/astra/
     ↓
-未认证 → 重定向至 auth.jppwl.asia (Logto)
+Kong Gateway (Lua 插件 oauth2-forward-auth 拦截)
     ↓
-Logto + GitHub / 账号密码登录
-    ↓
-Logto 回调 gw.jppwl.asia/astra/callback 携带 code
-    ↓
-后端换取 ID Token + Access Token
-    ↓
-创建/同步本地用户，签发 JWT
-    ↓
-后续请求携带 JWT 访问 API (/astra/api)
+向内部 http://oauth2-proxy.default.svc:4180/oauth2/auth 发送鉴权探针
+    ├─► [未认证 (401)] 页面导航: Kong 下发 302 重定向至 /oauth2/start?rd=/astra/
+    │                   ↓
+    │               Logto OIDC (https://sodaxw.logto.app/oidc)
+    │                   ↓
+    │               GitHub OAuth 授权
+    │                   ↓
+    │               /oauth2/callback 换票并写入 .jppwl.asia 根域 _oauth2_proxy Cookie
+    │                   ↓
+    │               自动跳回 /astra/ 页面完成无感登录
+    │
+    └─► [已认证 (202)] Kong 自动向下游 Pod 注入 X-Auth-Request-* 身份请求头：
+                        · X-Auth-Request-User: Logto sub 唯一身份锚点
+                        · X-Auth-Request-Email: 用户关联邮箱
+                        · X-Auth-Request-Preferred-Username: GitHub 用户名
+                        ↓
+                    FastAPI 从注入头无感获取当前用户，完成 MySQL 用户表同步与行级隔离
 ```
 
-**Logto 配置要点：**
-- **Endpoint**: `https://auth.jppwl.asia`
-- **App ID**: 从 Logto Console 获取
-- **App Secret**: 存储于 K8s Secret
-- **Redirect URI**: `https://gw.jppwl.asia/astra/callback`
-- **Scopes**: `openid profile email`
+**方案核心收益：**
+- **前端零 Token 存储**：无需在 localStorage 存储敏感 JWT，彻底免疫 XSS 窃取令牌攻击；
+- **跨微服务全站单点通用**：登录 LiteLLM UI 或 DbGate 后，打开 Astra 立即处于已登录态；
+- **优雅登出**：前端或用户访问 `/oauth2/sign_out?rd=/astra/` 即可一键清除全站 `.jppwl.asia` Cookie 并安全登出。
 
 **用户同步策略：**
-- 首次登录自动创建本地用户记录
-- `logto_user_id` 映射到本地 `users.id`
-- 用户头像、昵称定期从 Logto 同步
+- 首次访问时，后端自动通过 `UserRepository.get_or_create_by_sso` 在 MySQL 中创建或关联记录；
+- `logto_id` 与 `username` 自动映射并持久化，保障会话与聊天记录与当前真实用户严格行级绑定。
 
 ### 6.3 安全红线
 
