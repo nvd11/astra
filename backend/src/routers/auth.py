@@ -62,7 +62,7 @@ async def login(
             status_code=status.HTTP_403_FORBIDDEN, detail="Authentication is disabled"
         )
 
-    if settings.auth_mode != "logto":
+    if settings.auth_mode not in ("logto", "forward-auth"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Login endpoint is not available in {settings.auth_mode} mode",
