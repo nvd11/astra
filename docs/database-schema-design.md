@@ -51,7 +51,7 @@ erDiagram
         json preferences "前端通用个性化配置字典"
         varchar(64) default_model "默认绑定的大模型"
         varchar(64) default_agent "默认绑定的智能体模式"
-        varchar(64) logto_id UK "OIDC/Logto 微信扫码身份标识"
+        varchar(64) logto_id UK "OIDC/Logto (GitHub 登录) 身份标识"
         datetime created_at "注册创建时间"
         datetime updated_at "最近资料更新时间"
     }
@@ -151,7 +151,7 @@ CREATE TABLE `users` (
   | `preferences` | JSON | NOT NULL | `{}` | 前端自定义扩展字典（主题、打字速度等） |
   | `default_model` | VARCHAR(64) | NOT NULL | `gemini-3.8-flash` | 用户发起新会话时默认选取的模型 |
   | `default_agent` | VARCHAR(64) | NOT NULL | `auto` | 默认智能体策略（`auto`/`code_assistant` 等） |
-  | `logto_id` | VARCHAR(64) | NULL | NULL | Logto 微信扫码/Cloudflare OIDC `sub` 唯一锚点 |
+  | `logto_id` | VARCHAR(64) | NULL | NULL | Logto (GitHub 登录)/Cloudflare OIDC `sub` 唯一锚点 |
   | `created_at` | DATETIME | NOT NULL | UTC | 账号创建时间戳 |
   | `updated_at` | DATETIME | NOT NULL | UTC | 资料最近更新时间戳 |
 
