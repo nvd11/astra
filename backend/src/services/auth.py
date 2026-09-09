@@ -110,11 +110,57 @@ async def _get_user_from_forward_auth(
     email = request.headers.get("X-Auth-Request-Email") or request.headers.get(
         "x-auth-request-email"
     )
+    # 若网关将 sub 填入 email 且不含 @，清除脏 email
+    if email and "@" not in email:
+        email = None
+
     avatar_url = (
         f"https://github.com/{username}.png"
-        if username and username != "github-user"
+        if username and username != sso_id
         else None
     )
+
+    # 尝试通过 OAuth2-Proxy / Logto 传递的 Access Token 解析真实的 GitHub 用户名和官方头像
+    access_token = request.headers.get(
+        "X-Auth-Request-Access-Token"
+    ) or request.headers.get("x-auth-request-access-token")
+
+    if access_token and (username == sso_id or not avatar_url):
+        try:
+            from src.services.logto_service import get_logto_service
+
+            logto_service = get_logto_service()
+            user_info = await logto_service.get_user_info(access_token)
+            if user_info:
+                identities = user_info.get("identities", {})
+                github_details = identities.get("github", {}).get("details", {})
+                real_username = (
+                    github_details.get("login")
+                    or github_details.get("username")
+                    or user_info.get("username")
+                    or user_info.get("name")
+                    or user_info.get("preferred_username")
+                )
+                if real_username:
+                    username = real_username
+
+                real_avatar = (
+                    github_details.get("avatar_url")
+                    or user_info.get("picture")
+                    or (
+                        f"https://github.com/{username}.png"
+                        if username and username != sso_id
+                        else None
+                    )
+                )
+                if real_avatar:
+                    avatar_url = real_avatar
+
+                real_email = user_info.get("email")
+                if real_email and "@" in real_email:
+                    email = real_email
+        except Exception as e:
+            logger.warning(f"Failed to fetch profile from Logto: {e}")
 
     # 若注入了数据库异步会话，自动完成持久化同步并返回数据库 User 实体
     if db is not None:
