@@ -152,6 +152,19 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     });
 
     const messages = await conversationService.listMessages(id, 1, 100);
+    if (messages === null) {
+      // 该会话已在服务端被删除 (如在手机或其他终端已销毁)，自动从侧边栏剔除并拉取最新列表
+      const currentState = get();
+      set({
+        conversations: currentState.conversations.filter((c) => c.id !== id),
+        activeConversationId: null,
+        messages: [],
+        isLoadingMessages: false,
+      });
+      get().fetchConversations();
+      return;
+    }
+
     set({
       messages,
       isLoadingMessages: false,
