@@ -97,12 +97,13 @@ export const conversationService = {
 
   /**
    * 拉取指定会话下的历史消息明细 (按时间正序)
+   * 若返回 null 表示该会话在服务端已不存在 (404)
    */
   async listMessages(
     conversationId: string,
     page = 1,
     pageSize = 100
-  ): Promise<Message[]> {
+  ): Promise<Message[] | null> {
     try {
       const response = await api.get<BaseResponse<PaginatedData<Message>>>(
         `/conversations/${conversationId}/messages`,
@@ -114,7 +115,17 @@ export const conversationService = {
         return response.data.data.items || [];
       }
       return [];
-    } catch (err) {
+    } catch (err: unknown) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        typeof (err as { response?: { status?: number } }).response === 'object' &&
+        (err as { response?: { status?: number } }).response?.status === 404
+      ) {
+        // 会话在后端已被删除 (多端同步/已销毁)
+        return null;
+      }
       console.warn(`Failed to list messages for conv ${conversationId}:`, err);
       return [];
     }
