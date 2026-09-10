@@ -286,6 +286,10 @@ def parse_model_metadata(model_id: str, default_model: str) -> dict[str, Any]:
         provider = "Alibaba"
         name = "Qwen Max"
         description = "通义千问旗舰中文模型"
+    elif "glm" in mid:
+        provider = "Zhipu AI"
+        name = "GLM-5.3" if "5.3" in mid else f"GLM ({model_id})"
+        description = "智谱前沿旗舰认知与双语推理模型"
 
     return {
         "id": model_id,
