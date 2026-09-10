@@ -150,9 +150,24 @@ export const chatService = {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let receivedAnyChunk = false;
 
       while (true) {
-        const { done, value } = await reader.read();
+        let readResult: ReadableStreamReadResult<Uint8Array>;
+        try {
+          readResult = await reader.read();
+        } catch (readErr: unknown) {
+          // 如果连接在传输尾声被边缘网络 (如 Cloudflare HTTP/3 QUIC 超时或抖动) 中断，
+          // 但此时前端已经接收到大批量有效正文，优雅降级为正常结束，绝不向用户呈现破坏性的 network error
+          if (receivedAnyChunk) {
+            console.warn('Stream closed by transport layer after content was received:', readErr);
+            onFinish();
+            return;
+          }
+          throw readErr;
+        }
+
+        const { done, value } = readResult;
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -175,6 +190,7 @@ export const chatService = {
               throw new Error(parsed.message || 'Stream generation error');
             }
             if (parsed.delta) {
+              receivedAnyChunk = true;
               onDelta(parsed.delta, parsed as ChatStreamChunk);
             }
             if (parsed.finish_reason) {
