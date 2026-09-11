@@ -4,6 +4,7 @@
 严格遵循基于 current_user.id 的多租户行级数据隔离.
 """
 
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -33,6 +34,15 @@ from src.models.user import User
 from src.services.auth import get_current_user
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
+
+
+def ensure_utc(dt: datetime | None) -> datetime:
+    """确保 datetime 具备明确的 UTC 时区标识 (供 ISO-8601 序列化输出 Z 后缀)."""
+    if dt is None:
+        return datetime.now(UTC)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
 
 
 @router.post(
@@ -92,8 +102,8 @@ async def create_conversation(
             agent_preference=conversation.agent_preference,
             system_prompt=conversation.system_prompt,
             is_archived=conversation.is_archived,
-            created_at=conversation.created_at,
-            updated_at=conversation.updated_at,
+            created_at=ensure_utc(conversation.created_at),
+            updated_at=ensure_utc(conversation.updated_at),
             message_count=0,
         ),
     )
@@ -138,8 +148,8 @@ async def list_conversations(
             agent_preference=conv.agent_preference,
             system_prompt=conv.system_prompt,
             is_archived=conv.is_archived,
-            created_at=conv.created_at,
-            updated_at=conv.updated_at,
+            created_at=ensure_utc(conv.created_at),
+            updated_at=ensure_utc(conv.updated_at),
             message_count=msg_counts.get(conv.id, 0),
         )
         for conv in items
@@ -195,8 +205,8 @@ async def get_conversation(
             agent_preference=conversation.agent_preference,
             system_prompt=conversation.system_prompt,
             is_archived=conversation.is_archived,
-            created_at=conversation.created_at,
-            updated_at=conversation.updated_at,
+            created_at=ensure_utc(conversation.created_at),
+            updated_at=ensure_utc(conversation.updated_at),
             message_count=msg_count,
         ),
     )
@@ -242,8 +252,8 @@ async def update_conversation(
             agent_preference=updated.agent_preference,
             system_prompt=updated.system_prompt,
             is_archived=updated.is_archived,
-            created_at=updated.created_at,
-            updated_at=updated.updated_at,
+            created_at=ensure_utc(updated.created_at),
+            updated_at=ensure_utc(updated.updated_at),
             message_count=msg_count,
         ),
     )
