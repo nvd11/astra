@@ -24,6 +24,23 @@ interface SidebarProps {
   onSelectTab?: (tab: 'chat' | 'knowledge' | 'settings') => void;
 }
 
+// 辅助函数：解析后端返回的 UTC 时间戳 (带时区容错补偿)
+function parseUtcDate(dateStr?: string | Date): number {
+  if (!dateStr) return Date.now();
+  if (dateStr instanceof Date) return dateStr.getTime();
+  let normalized = String(dateStr).trim();
+  // 若无时区后缀，补充 'Z' 标识以按真实 UTC 时刻解析并转换为浏览器本地时间
+  if (
+    !normalized.endsWith('Z') &&
+    !normalized.includes('+') &&
+    !normalized.match(/-\d{2}:\d{2}$/)
+  ) {
+    normalized = normalized.replace(' ', 'T') + 'Z';
+  }
+  const time = new Date(normalized).getTime();
+  return isNaN(time) ? new Date(dateStr).getTime() : time;
+}
+
 // 辅助函数：按时间划分会话分组 (今天 / 昨天 / 前7天 / 更早)
 function groupConversations(convs: Conversation[]) {
   const today: Conversation[] = [];
@@ -41,7 +58,7 @@ function groupConversations(convs: Conversation[]) {
   const past7DaysStart = todayStart - 6 * 86400000;
 
   for (const c of convs) {
-    const time = new Date(c.updated_at || c.created_at).getTime();
+    const time = parseUtcDate(c.updated_at || c.created_at);
     if (time >= todayStart) {
       today.push(c);
     } else if (time >= yesterdayStart) {
