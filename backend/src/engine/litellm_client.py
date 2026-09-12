@@ -198,6 +198,7 @@ class LiteLLMClient:
     ) -> AsyncIterator[dict[str, Any]]:
         """通过 LiteLLM /hermes/{agent}/v1/chat/completions 无损消费 SSE 原生流."""
         import json
+
         import httpx
 
         # 兼容带 /v1 或不带 /v1 的 base_url
@@ -222,55 +223,57 @@ class LiteLLMClient:
 
         logger.info(f"Connecting to Hermes Agent via LiteLLM passthrough: {url}")
         try:
-            async with httpx.AsyncClient(timeout=600.0) as client:
-                async with client.stream("POST", url, headers=headers, json=payload) as response:
-                    response.raise_for_status()
-                    current_event = None
-                    async for line in response.aiter_lines():
-                        if not line:
-                            current_event = None
+            async with (
+                httpx.AsyncClient(timeout=600.0) as client,
+                client.stream("POST", url, headers=headers, json=payload) as response,
+            ):
+                response.raise_for_status()
+                current_event = None
+                async for line in response.aiter_lines():
+                    if not line:
+                        current_event = None
+                        continue
+
+                    line_str = line.strip()
+                    if line_str.startswith("event:"):
+                        current_event = line_str[6:].strip()
+                        continue
+
+                    if line_str.startswith("data:"):
+                        raw_data = line_str[5:].strip()
+                        if raw_data == "[DONE]":
+                            break
+
+                        try:
+                            data_obj = json.loads(raw_data)
+                        except Exception:
                             continue
 
-                        line_str = line.strip()
-                        if line_str.startswith("event:"):
-                            current_event = line_str[6:].strip()
+                        # 🎯 自定义工具流事件
+                        if current_event == "hermes.tool.progress":
+                            yield {
+                                "delta": "",
+                                "tool_progress": data_obj,
+                                "finish_reason": None,
+                                "model": agent_name,
+                            }
                             continue
 
-                        if line_str.startswith("data:"):
-                            raw_data = line_str[5:].strip()
-                            if raw_data == "[DONE]":
-                                break
-
-                            try:
-                                data_obj = json.loads(raw_data)
-                            except Exception:
+                        # 🎯 标准 OpenAI ChatCompletionChunk
+                        choices = data_obj.get("choices", [])
+                        if choices:
+                            choice = choices[0]
+                            delta = choice.get("delta", {})
+                            content = delta.get("content", "")
+                            finish_reason = choice.get("finish_reason")
+                            # 忽略首帧空的 role="assistant" 帧，避免下发空增量
+                            if not content and not finish_reason:
                                 continue
-
-                            # 🎯 自定义工具流事件
-                            if current_event == "hermes.tool.progress":
-                                yield {
-                                    "delta": "",
-                                    "tool_progress": data_obj,
-                                    "finish_reason": None,
-                                    "model": agent_name,
-                                }
-                                continue
-
-                            # 🎯 标准 OpenAI ChatCompletionChunk
-                            choices = data_obj.get("choices", [])
-                            if choices:
-                                choice = choices[0]
-                                delta = choice.get("delta", {})
-                                content = delta.get("content", "")
-                                finish_reason = choice.get("finish_reason")
-                                # 忽略首帧空的 role="assistant" 帧，避免下发空增量
-                                if not content and not finish_reason:
-                                    continue
-                                yield {
-                                    "delta": content,
-                                    "finish_reason": finish_reason,
-                                    "model": data_obj.get("model", agent_name),
-                                }
+                            yield {
+                                "delta": content,
+                                "finish_reason": finish_reason,
+                                "model": data_obj.get("model", agent_name),
+                            }
 
         except Exception as err:
             logger.error(f"Hermes passthrough stream error: {err}")
