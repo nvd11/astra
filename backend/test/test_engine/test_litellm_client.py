@@ -108,22 +108,26 @@ class TestLiteLLMClient:
     @pytest.mark.asyncio
     async def test_astream_completion_hermes_passthrough(self, client):
         """测试 Hermes Agent (rin/yui) 通过 LiteLLM 无损流式透传与工具事件解析."""
+
         class MockLineStream:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             def raise_for_status(self):
                 pass
+
             async def aiter_lines(self):
                 yield 'data: {"choices": [{"delta": {"role": "assistant"}}]}'
-                yield ''
-                yield 'event: hermes.tool.progress'
+                yield ""
+                yield "event: hermes.tool.progress"
                 yield 'data: {"tool": "execute_code", "emoji": "🐍", "status": "running"}'
-                yield ''
+                yield ""
                 yield 'data: {"choices": [{"delta": {"content": "结果出来了"}}]}'
-                yield ''
-                yield 'data: [DONE]'
+                yield ""
+                yield "data: [DONE]"
 
         with patch("httpx.AsyncClient.stream", return_value=MockLineStream()):
             chunks = []
@@ -134,7 +138,11 @@ class TestLiteLLMClient:
                 chunks.append(c)
 
             assert len(chunks) == 2
-            assert chunks[0]["tool_progress"] == {"tool": "execute_code", "emoji": "🐍", "status": "running"}
+            assert chunks[0]["tool_progress"] == {
+                "tool": "execute_code",
+                "emoji": "🐍",
+                "status": "running",
+            }
             assert chunks[1]["delta"] == "结果出来了"
 
     @pytest.mark.asyncio
