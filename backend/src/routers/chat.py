@@ -290,6 +290,10 @@ def parse_model_metadata(model_id: str, default_model: str) -> dict[str, Any]:
         provider = "Zhipu AI"
         name = "GLM-5.3" if "5.3" in mid else f"GLM ({model_id})"
         description = "智谱前沿旗舰认知与双语推理模型"
+    elif "rin" in mid:
+        provider = "Radxa Local"
+        name = "Rin (Hermes Agent)"
+        description = "傲娇大小姐凛 · 本地私有边缘 Hermes 智能体"
 
     return {
         "id": model_id,
