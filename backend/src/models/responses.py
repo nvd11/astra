@@ -120,6 +120,9 @@ class ChatStreamChunkData(BaseModel):
     finish_reason: str | None = Field(default=None, description="结束原因")
     model: str = Field(description="模型名称")
     agent: str = Field(description="Agent 名称")
+    tool_progress: dict[str, Any] | None = Field(
+        default=None, description="Hermes Agent 实时工具执行进度详情"
+    )
 
 
 # 常用类型别名

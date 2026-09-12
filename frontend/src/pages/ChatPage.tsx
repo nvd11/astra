@@ -1,13 +1,14 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Sparkles, User as UserIcon, ArrowDown, Cpu, Loader2 } from 'lucide-react';
 import { EmptyState } from '@/components/chat/EmptyState';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
+import { ToolProgressCard } from '@/components/chat/ToolProgressCard';
 import { useChatStore } from '@/stores/chatStore';
 import { useTypewriter } from '@/hooks/useTypewriter';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import { chatService } from '@/services/chat';
-import { Message } from '@/types';
+import { Message, ToolProgressEvent } from '@/types';
 import { storage } from '@/utils/storage';
 
 export const ChatPage: React.FC = () => {
@@ -27,6 +28,7 @@ export const ChatPage: React.FC = () => {
     isLoadingMessages,
   } = useChatStore();
 
+  const [streamingToolEvents, setStreamingToolEvents] = useState<ToolProgressEvent[]>([]);
   const activeAssistantMsgIdRef = useRef<string | null>(null);
 
   // 1. 智能吸底与用户脱钩滚动 Hook
@@ -41,6 +43,9 @@ export const ChatPage: React.FC = () => {
         updateMessage(msgId, {
           content: fullText,
           isStreaming: false,
+          metadata: {
+            tool_progresses: streamingToolEvents,
+          },
         });
       }
       setIsStreaming(false);
@@ -118,6 +123,7 @@ export const ChatPage: React.FC = () => {
     addMessage(placeholderAssistantMsg);
 
     // 4. 重置打字机并开启流状态
+    setStreamingToolEvents([]);
     typewriter.reset();
     setIsStreaming(true);
 
@@ -134,6 +140,18 @@ export const ChatPage: React.FC = () => {
       modelOverride: currentModel,
       agentOverride: currentAgent,
       signal: abortController.signal,
+      onToolProgress: (event) => {
+        setStreamingToolEvents((prev) => {
+          const existingIdx = prev.findIndex((e) => e.toolCallId === event.toolCallId && event.toolCallId);
+          if (existingIdx >= 0) {
+            const next = [...prev];
+            next[existingIdx] = { ...next[existingIdx], ...event };
+            return next;
+          }
+          return [...prev, event];
+        });
+        autoScrollIfAttached();
+      },
       onDelta: (delta, chunk) => {
         typewriter.enqueue(delta);
         if (chunk?.agent) {
@@ -214,6 +232,14 @@ export const ChatPage: React.FC = () => {
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       ) : (
                         <div className="w-full">
+                          {/* 🎯 工具调用进度指示卡片 (实时流中或历史落库消息) */}
+                          {isCurrentStreamingMsg && streamingToolEvents.length > 0 && (
+                            <ToolProgressCard events={streamingToolEvents} />
+                          )}
+                          {!isCurrentStreamingMsg && msg.metadata?.tool_progresses && msg.metadata.tool_progresses.length > 0 && (
+                            <ToolProgressCard events={msg.metadata.tool_progresses} />
+                          )}
+
                           <MarkdownRenderer content={contentToDisplay} />
                           {/* 呼吸脉冲打字光标 */}
                           {isCurrentStreamingMsg && typewriter.isTyping && (
