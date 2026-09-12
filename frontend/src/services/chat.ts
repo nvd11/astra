@@ -17,6 +17,7 @@ export interface StreamChatParams {
   agentOverride?: string;
   signal?: AbortSignal;
   onDelta: (delta: string, chunk?: ChatStreamChunk) => void;
+  onToolProgress?: (event: import('@/types').ToolProgressEvent) => void;
   onFinish: () => void;
   onError: (err: Error) => void;
 }
@@ -104,6 +105,7 @@ export const chatService = {
       agentOverride,
       signal,
       onDelta,
+      onToolProgress,
       onFinish,
       onError,
     } = params;
@@ -188,6 +190,9 @@ export const chatService = {
             const parsed = JSON.parse(dataStr);
             if (parsed.error) {
               throw new Error(parsed.message || 'Stream generation error');
+            }
+            if (parsed.tool_progress && onToolProgress) {
+              onToolProgress(parsed.tool_progress);
             }
             if (parsed.delta) {
               receivedAnyChunk = true;

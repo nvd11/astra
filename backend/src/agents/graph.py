@@ -236,4 +236,5 @@ async def astream_chat(
             "finish_reason": chunk.get("finish_reason"),
             "model": chunk.get("model", model),
             "agent": resolved_agent,
+            "tool_progress": chunk.get("tool_progress"),
         }

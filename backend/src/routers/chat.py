@@ -135,6 +135,7 @@ async def chat_stream(
                     finish_reason=chunk_finish_reason,
                     model=final_model,
                     agent=final_agent,
+                    tool_progress=chunk.get("tool_progress"),
                 )
 
                 yield f"data: {chunk_payload.model_dump_json()}\n\n"

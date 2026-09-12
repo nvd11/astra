@@ -1,6 +1,17 @@
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
 /**
+ * Hermes Agent 工具调用过程指示
+ */
+export interface ToolProgressEvent {
+  tool: string;
+  emoji?: string;
+  label?: string;
+  toolCallId?: string;
+  status: 'running' | 'completed' | 'failed';
+}
+
+/**
  * 消息明细实体 (与后端 MessageData 严格对齐)
  */
 export interface Message {
@@ -14,6 +25,7 @@ export interface Message {
     finish_reason?: string | null;
     tokens_used?: number;
     thinking?: string;
+    tool_progresses?: ToolProgressEvent[];
   } | null;
   tokens_used?: number | null;
   created_at: string;
@@ -29,4 +41,5 @@ export interface ChatStreamChunk {
   finish_reason: string | null;
   model: string;
   agent: string;
+  tool_progress?: ToolProgressEvent | null;
 }
