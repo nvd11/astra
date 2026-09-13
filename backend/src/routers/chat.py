@@ -104,6 +104,7 @@ async def chat_stream(
     async def event_generator() -> AsyncIterator[str]:
         """SSE 数据生成器."""
         collected_chunks: list[str] = []
+        collected_tool_events: list[dict[str, Any]] = []
         final_model = model
         final_agent = agent
         finish_reason = None
@@ -122,6 +123,25 @@ async def chat_stream(
                 if delta:
                     collected_chunks.append(delta)
 
+                tool_progress = chunk.get("tool_progress")
+                if tool_progress:
+                    tool_call_id = tool_progress.get("toolCallId")
+                    if tool_call_id:
+                        existing = next(
+                            (
+                                e
+                                for e in collected_tool_events
+                                if e.get("toolCallId") == tool_call_id
+                            ),
+                            None,
+                        )
+                        if existing:
+                            existing.update(tool_progress)
+                        else:
+                            collected_tool_events.append(dict(tool_progress))
+                    else:
+                        collected_tool_events.append(dict(tool_progress))
+
                 chunk_finish_reason = chunk.get("finish_reason")
                 if chunk_finish_reason:
                     finish_reason = chunk_finish_reason
@@ -135,7 +155,7 @@ async def chat_stream(
                     finish_reason=chunk_finish_reason,
                     model=final_model,
                     agent=final_agent,
-                    tool_progress=chunk.get("tool_progress"),
+                    tool_progress=tool_progress,
                 )
 
                 yield f"data: {chunk_payload.model_dump_json()}\n\n"
@@ -171,16 +191,20 @@ async def chat_stream(
                         persist_msg_repo = MessageRepository(session)
                         persist_conv_repo = ConversationRepository(session)
 
+                        message_metadata: dict[str, Any] = {
+                            "agent": final_agent,
+                            "finish_reason": finish_reason,
+                        }
+                        if collected_tool_events:
+                            message_metadata["tool_progresses"] = collected_tool_events
+
                         await persist_msg_repo.create(
                             conversation_id=conversation_id,
                             user_id=user_id,
                             session_id=session_id,
                             role="assistant",
                             content=full_response_text,
-                            metadata={
-                                "agent": final_agent,
-                                "finish_reason": finish_reason,
-                            },
+                            metadata=message_metadata,
                         )
 
                         # 刷新会话更新时间
