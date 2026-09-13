@@ -173,13 +173,21 @@ class LiteLLMClient:
 
                 choice = chunk.choices[0]
                 delta_content = ""
+                thinking_content = None
                 if hasattr(choice, "delta") and choice.delta:
                     delta_content = getattr(choice.delta, "content", "") or ""
+                    # 🎯 提取深度思考增量 (DeepSeek-R1 / Claude 3.7 / LiteLLM reasoning_content)
+                    raw_thinking = getattr(choice.delta, "reasoning_content", None)
+                    if not raw_thinking and hasattr(choice.delta, "thought"):
+                        raw_thinking = getattr(choice.delta, "thought", None)
+                    if raw_thinking:
+                        thinking_content = str(raw_thinking)
 
                 finish_reason = getattr(choice, "finish_reason", None)
 
                 yield {
                     "delta": delta_content,
+                    "thinking_delta": thinking_content,
                     "finish_reason": finish_reason,
                     "model": getattr(chunk, "model", formatted_model),
                 }
@@ -265,12 +273,19 @@ class LiteLLMClient:
                             choice = choices[0]
                             delta = choice.get("delta", {})
                             content = delta.get("content", "")
+                            # 🎯 提取 Hermes 思考增量 (reasoning_content 或 thought)
+                            thinking = (
+                                delta.get("reasoning_content")
+                                or delta.get("thought")
+                                or None
+                            )
                             finish_reason = choice.get("finish_reason")
                             # 忽略首帧空的 role="assistant" 帧，避免下发空增量
-                            if not content and not finish_reason:
+                            if not content and not finish_reason and not thinking:
                                 continue
                             yield {
                                 "delta": content,
+                                "thinking_delta": thinking,
                                 "finish_reason": finish_reason,
                                 "model": data_obj.get("model", agent_name),
                             }

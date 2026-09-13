@@ -122,6 +122,8 @@ class TestLiteLLMClient:
             async def aiter_lines(self):
                 yield 'data: {"choices": [{"delta": {"role": "assistant"}}]}'
                 yield ""
+                yield 'data: {"choices": [{"delta": {"reasoning_content": "分析主人的指令..."}}]}'
+                yield ""
                 yield "event: hermes.tool.progress"
                 yield 'data: {"tool": "execute_code", "emoji": "🐍", "status": "running"}'
                 yield ""
@@ -137,13 +139,14 @@ class TestLiteLLMClient:
             ):
                 chunks.append(c)
 
-            assert len(chunks) == 2
-            assert chunks[0]["tool_progress"] == {
+            assert len(chunks) == 3
+            assert chunks[0]["thinking_delta"] == "分析主人的指令..."
+            assert chunks[1]["tool_progress"] == {
                 "tool": "execute_code",
                 "emoji": "🐍",
                 "status": "running",
             }
-            assert chunks[1]["delta"] == "结果出来了"
+            assert chunks[2]["delta"] == "结果出来了"
 
     @pytest.mark.asyncio
     async def test_astream_completion_error(self, client):
