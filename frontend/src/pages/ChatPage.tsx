@@ -29,6 +29,7 @@ export const ChatPage: React.FC = () => {
   } = useChatStore();
 
   const [streamingToolEvents, setStreamingToolEvents] = useState<ToolProgressEvent[]>([]);
+  const streamingToolEventsRef = useRef<ToolProgressEvent[]>([]);
   const activeAssistantMsgIdRef = useRef<string | null>(null);
 
   // 1. 智能吸底与用户脱钩滚动 Hook
@@ -44,13 +45,15 @@ export const ChatPage: React.FC = () => {
           content: fullText,
           isStreaming: false,
           metadata: {
-            tool_progresses: streamingToolEvents,
+            tool_progresses: [...streamingToolEventsRef.current],
           },
         });
       }
       setIsStreaming(false);
       setAbortController(null);
       activeAssistantMsgIdRef.current = null;
+      setStreamingToolEvents([]);
+      streamingToolEventsRef.current = [];
       // 结束后最终吸底对齐
       autoScrollIfAttached();
     },
@@ -123,6 +126,7 @@ export const ChatPage: React.FC = () => {
     addMessage(placeholderAssistantMsg);
 
     // 4. 重置打字机并开启流状态
+    streamingToolEventsRef.current = [];
     setStreamingToolEvents([]);
     typewriter.reset();
     setIsStreaming(true);
@@ -141,22 +145,35 @@ export const ChatPage: React.FC = () => {
       agentOverride: currentAgent,
       signal: abortController.signal,
       onToolProgress: (event) => {
-        setStreamingToolEvents((prev) => {
-          const existingIdx = prev.findIndex((e) => e.toolCallId === event.toolCallId && event.toolCallId);
-          if (existingIdx >= 0) {
-            const next = [...prev];
-            next[existingIdx] = { ...next[existingIdx], ...event };
-            return next;
-          }
-          return [...prev, event];
+        const prev = streamingToolEventsRef.current;
+        const existingIdx = prev.findIndex((e) => e.toolCallId === event.toolCallId && event.toolCallId);
+        let next: ToolProgressEvent[];
+        if (existingIdx >= 0) {
+          next = [...prev];
+          next[existingIdx] = { ...next[existingIdx], ...event };
+        } else {
+          next = [...prev, event];
+        }
+        streamingToolEventsRef.current = next;
+        setStreamingToolEvents(next);
+
+        // 同步挂载到当前 Assistant 消息的 metadata 上，确保在任何重渲染或未完成前状态不丢失
+        updateMessage(assistantMsgId, {
+          metadata: {
+            tool_progresses: next,
+          },
         });
+
         autoScrollIfAttached();
       },
       onDelta: (delta, chunk) => {
         typewriter.enqueue(delta);
         if (chunk?.agent) {
           updateMessage(assistantMsgId, {
-            metadata: { agent: chunk.agent },
+            metadata: {
+              agent: chunk.agent,
+              tool_progresses: streamingToolEventsRef.current,
+            },
           });
         }
       },
@@ -232,13 +249,16 @@ export const ChatPage: React.FC = () => {
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       ) : (
                         <div className="w-full">
-                          {/* 🎯 工具调用进度指示卡片 (实时流中或历史落库消息) */}
-                          {isCurrentStreamingMsg && streamingToolEvents.length > 0 && (
-                            <ToolProgressCard events={streamingToolEvents} />
-                          )}
-                          {!isCurrentStreamingMsg && msg.metadata?.tool_progresses && msg.metadata.tool_progresses.length > 0 && (
-                            <ToolProgressCard events={msg.metadata.tool_progresses} />
-                          )}
+                          {/* 🎯 工具调用进度指示卡片 (实时流中优先使用 streamingToolEvents，其他或落库消息使用 metadata) */}
+                          {(() => {
+                            const eventsToRender =
+                              isCurrentStreamingMsg && streamingToolEvents.length > 0
+                                ? streamingToolEvents
+                                : msg.metadata?.tool_progresses;
+                            return eventsToRender && eventsToRender.length > 0 ? (
+                              <ToolProgressCard events={eventsToRender} />
+                            ) : null;
+                          })()}
 
                           <MarkdownRenderer content={contentToDisplay} />
                           {/* 呼吸脉冲打字光标 */}
