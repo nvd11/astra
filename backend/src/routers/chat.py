@@ -104,6 +104,7 @@ async def chat_stream(
     async def event_generator() -> AsyncIterator[str]:
         """SSE 数据生成器."""
         collected_chunks: list[str] = []
+        collected_thinking_chunks: list[str] = []
         collected_tool_events: list[dict[str, Any]] = []
         final_model = model
         final_agent = agent
@@ -122,6 +123,10 @@ async def chat_stream(
                 delta = chunk.get("delta", "")
                 if delta:
                     collected_chunks.append(delta)
+
+                thinking_delta = chunk.get("thinking_delta")
+                if thinking_delta:
+                    collected_thinking_chunks.append(thinking_delta)
 
                 tool_progress = chunk.get("tool_progress")
                 if tool_progress:
@@ -155,6 +160,7 @@ async def chat_stream(
                     finish_reason=chunk_finish_reason,
                     model=final_model,
                     agent=final_agent,
+                    thinking_delta=thinking_delta,
                     tool_progress=tool_progress,
                 )
 
@@ -195,6 +201,10 @@ async def chat_stream(
                             "agent": final_agent,
                             "finish_reason": finish_reason,
                         }
+                        if collected_thinking_chunks:
+                            message_metadata["thinking"] = "".join(
+                                collected_thinking_chunks
+                            )
                         if collected_tool_events:
                             message_metadata["tool_progresses"] = collected_tool_events
 

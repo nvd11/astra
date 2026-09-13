@@ -41,5 +41,6 @@ export interface ChatStreamChunk {
   finish_reason: string | null;
   model: string;
   agent: string;
+  thinking_delta?: string | null;
   tool_progress?: ToolProgressEvent | null;
 }

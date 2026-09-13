@@ -233,6 +233,7 @@ async def astream_chat(
 
         yield {
             "delta": chunk.get("delta", ""),
+            "thinking_delta": chunk.get("thinking_delta"),
             "finish_reason": chunk.get("finish_reason"),
             "model": chunk.get("model", model),
             "agent": resolved_agent,

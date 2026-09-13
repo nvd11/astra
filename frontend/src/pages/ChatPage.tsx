@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/chat/EmptyState';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 import { ToolProgressCard } from '@/components/chat/ToolProgressCard';
+import { ThinkingBlock } from '@/components/chat/ThinkingBlock';
 import { useChatStore } from '@/stores/chatStore';
 import { useTypewriter } from '@/hooks/useTypewriter';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
@@ -29,7 +30,9 @@ export const ChatPage: React.FC = () => {
   } = useChatStore();
 
   const [streamingToolEvents, setStreamingToolEvents] = useState<ToolProgressEvent[]>([]);
+  const [streamingThinking, setStreamingThinking] = useState<string>('');
   const streamingToolEventsRef = useRef<ToolProgressEvent[]>([]);
+  const streamingThinkingRef = useRef<string>('');
   const activeAssistantMsgIdRef = useRef<string | null>(null);
 
   // 1. 智能吸底与用户脱钩滚动 Hook
@@ -45,6 +48,7 @@ export const ChatPage: React.FC = () => {
           content: fullText,
           isStreaming: false,
           metadata: {
+            thinking: streamingThinkingRef.current || undefined,
             tool_progresses: [...streamingToolEventsRef.current],
           },
         });
@@ -53,7 +57,9 @@ export const ChatPage: React.FC = () => {
       setAbortController(null);
       activeAssistantMsgIdRef.current = null;
       setStreamingToolEvents([]);
+      setStreamingThinking('');
       streamingToolEventsRef.current = [];
+      streamingThinkingRef.current = '';
       // 结束后最终吸底对齐
       autoScrollIfAttached();
     },
@@ -127,7 +133,9 @@ export const ChatPage: React.FC = () => {
 
     // 4. 重置打字机并开启流状态
     streamingToolEventsRef.current = [];
+    streamingThinkingRef.current = '';
     setStreamingToolEvents([]);
+    setStreamingThinking('');
     typewriter.reset();
     setIsStreaming(true);
 
@@ -144,6 +152,20 @@ export const ChatPage: React.FC = () => {
       modelOverride: currentModel,
       agentOverride: currentAgent,
       signal: abortController.signal,
+      onThinkingDelta: (thinkingDelta) => {
+        const next = streamingThinkingRef.current + thinkingDelta;
+        streamingThinkingRef.current = next;
+        setStreamingThinking(next);
+
+        updateMessage(assistantMsgId, {
+          metadata: {
+            thinking: next,
+            tool_progresses: streamingToolEventsRef.current,
+          },
+        });
+
+        autoScrollIfAttached();
+      },
       onToolProgress: (event) => {
         const prev = streamingToolEventsRef.current;
         const existingIdx = prev.findIndex((e) => e.toolCallId === event.toolCallId && event.toolCallId);
@@ -160,6 +182,7 @@ export const ChatPage: React.FC = () => {
         // 同步挂载到当前 Assistant 消息的 metadata 上，确保在任何重渲染或未完成前状态不丢失
         updateMessage(assistantMsgId, {
           metadata: {
+            thinking: streamingThinkingRef.current || undefined,
             tool_progresses: next,
           },
         });
@@ -172,6 +195,7 @@ export const ChatPage: React.FC = () => {
           updateMessage(assistantMsgId, {
             metadata: {
               agent: chunk.agent,
+              thinking: streamingThinkingRef.current || undefined,
               tool_progresses: streamingToolEventsRef.current,
             },
           });
@@ -249,6 +273,20 @@ export const ChatPage: React.FC = () => {
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       ) : (
                         <div className="w-full">
+                          {/* 🎯 深度思考过程展示 (流式中优先使用 streamingThinking，历史回显使用 metadata.thinking) */}
+                          {(() => {
+                            const thinkingToRender =
+                              isCurrentStreamingMsg && streamingThinking
+                                ? streamingThinking
+                                : msg.metadata?.thinking;
+                            return thinkingToRender ? (
+                              <ThinkingBlock
+                                thinking={thinkingToRender}
+                                isStreaming={isCurrentStreamingMsg && isStreaming}
+                              />
+                            ) : null;
+                          })()}
+
                           {/* 🎯 工具调用进度指示卡片 (实时流中优先使用 streamingToolEvents，其他或落库消息使用 metadata) */}
                           {(() => {
                             const eventsToRender =
