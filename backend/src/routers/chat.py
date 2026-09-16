@@ -140,7 +140,9 @@ async def chat_stream(
 
             while True:
                 try:
-                    chunk = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    # 🎯 心跳保活机制：若上游正在执行复杂工具，定期发出 SSE 注释帧防止 Cloudflare 100s 断流
+                    timeout_val = getattr(settings, "stream_ping_interval", 15.0)
+                    chunk = await asyncio.wait_for(queue.get(), timeout=timeout_val)
                 except TimeoutError:
                     yield ": keepalive-ping\n\n"
                     continue
