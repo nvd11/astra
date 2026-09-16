@@ -3,6 +3,7 @@
 支持私有 LiteLLM 网关流式输出、打字机效果推送、消息入库及手动中止推理.
 """
 
+import asyncio
 import contextlib
 import json
 import uuid
@@ -119,7 +120,19 @@ async def chat_stream(
                 stop_checker=check_is_stopped,
             )
 
-            async for chunk in stream:
+            stream_iter = stream.__aiter__()
+            while True:
+                try:
+                    # 🎯 15 秒心跳保活机制：若上游在执行跨云/系统等复杂工具，每 15 秒发出一次 SSE 注释帧防止 Cloudflare 100s 断流
+                    chunk = await asyncio.wait_for(
+                        stream_iter.__anext__(), timeout=15.0
+                    )
+                except TimeoutError:
+                    yield ": keepalive-ping\n\n"
+                    continue
+                except StopAsyncIteration:
+                    break
+
                 delta = chunk.get("delta", "")
                 if delta:
                     collected_chunks.append(delta)
