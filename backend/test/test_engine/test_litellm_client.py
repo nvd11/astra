@@ -149,6 +149,54 @@ class TestLiteLLMClient:
             assert chunks[2]["delta"] == "结果出来了"
 
     @pytest.mark.asyncio
+    async def test_astream_completion_hermes_passthrough_with_session_header(
+        self, client
+    ):
+        """测试 Hermes Agent 请求透传时附带 X-Hermes-Session-Id 绑定会话."""
+        captured_headers = {}
+
+        class MockCaptureStream:
+            def __init__(self, headers):
+                nonlocal captured_headers
+                captured_headers = headers
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+
+            def raise_for_status(self):
+                pass
+
+            async def aiter_lines(self):
+                yield 'data: {"choices": [{"delta": {"content": "ok"}}]}'
+                yield ""
+                yield "data: [DONE]"
+
+        def mock_stream_factory(method, url, headers=None, **kwargs):
+            return MockCaptureStream(headers)
+
+        with patch("httpx.AsyncClient.stream", side_effect=mock_stream_factory):
+            chunks = []
+            async for c in client.astream_completion(
+                messages=[{"role": "user", "content": "test"}],
+                model="yui",
+                conversation_id="my-custom-conv-123",
+            ):
+                chunks.append(c)
+
+            assert len(chunks) == 1
+            assert chunks[0]["delta"] == "ok"
+            # 验证 X-Hermes-Session-Id 和 X-Hermes-Session-Key 均被正确绑定注入
+            assert (
+                captured_headers.get("X-Hermes-Session-Id") == "conv_my-custom-conv-123"
+            )
+            assert (
+                captured_headers.get("X-Hermes-Session-Key") == "key_my-custom-conv-123"
+            )
+
+    @pytest.mark.asyncio
     async def test_astream_completion_error(self, client):
         """测试流式异步补全生成器 - 异常中断."""
         with patch("litellm.acompletion", new_callable=AsyncMock) as mock_litellm:
