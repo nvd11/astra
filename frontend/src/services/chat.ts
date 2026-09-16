@@ -137,6 +137,7 @@ export const chatService = {
       const response = await fetch(`${API_BASE_URL}/chat/stream`, {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify(bodyPayload),
         signal,
       });
