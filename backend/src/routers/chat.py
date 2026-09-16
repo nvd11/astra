@@ -118,6 +118,7 @@ async def chat_stream(
                 agent_preference=agent,
                 system_prompt=conv.system_prompt,
                 stop_checker=check_is_stopped,
+                conversation_id=conversation_id,
             )
 
             # 🎯 使用异步队列解耦流读取与心跳保活：

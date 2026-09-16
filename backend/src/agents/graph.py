@@ -182,6 +182,7 @@ async def astream_chat(
     system_prompt: str | None = None,
     stop_checker: Callable[[], bool | Any] | None = None,
     litellm_client: LiteLLMClient | None = None,
+    conversation_id: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """智能体流式推理统一入口 (支持实时中断与 Agent 标签附着).
 
@@ -212,7 +213,9 @@ async def astream_chat(
     logger.debug(f"astream_chat start: agent={resolved_agent}, model={model}")
 
     # 调用 LiteLLM 流式输出
-    stream = client.astream_completion(messages=prepared_messages, model=model)
+    stream = client.astream_completion(
+        messages=prepared_messages, model=model, conversation_id=conversation_id
+    )
 
     async for chunk in stream:
         # 实时检查外部中断信号 (如前端点击停止生成)

@@ -220,6 +220,12 @@ class LiteLLMClient:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
+        # 🎯 提取客户端传入的 conversation_id 绑定为 Hermes Session，避免隐式 session ID 冲突造成跨轮中断
+        conversation_id = kwargs.get("conversation_id")
+        if conversation_id:
+            headers["X-Hermes-Session-Id"] = f"conv_{conversation_id}"
+            headers["X-Hermes-Session-Key"] = f"key_{conversation_id}"
+
         payload = {
             "model": agent_name,
             "messages": messages,
