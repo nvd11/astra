@@ -120,18 +120,35 @@ async def chat_stream(
                 stop_checker=check_is_stopped,
             )
 
-            stream_iter = stream.__aiter__()
+            # 🎯 使用异步队列解耦流读取与心跳保活：
+            # 在 Python 中直接对 generator 调用 asyncio.wait_for(stream_iter.__anext__())
+            # 会在超时抛出 TimeoutError 时直接 Cancel 掉底层的异步生成器，导致整个流被强行中断！
+            # 通过独立后台 pump 任务推入 Queue，既能安全无损下发 : keepalive-ping 保活心跳，又绝不影响流生成。
+            queue: asyncio.Queue[Any] = asyncio.Queue()
+
+            async def pump_stream() -> None:
+                try:
+                    async for item in stream:
+                        await queue.put(item)
+                except Exception as pump_err:
+                    await queue.put(pump_err)
+                finally:
+                    await queue.put(None)
+
+            pump_task = asyncio.create_task(pump_stream())
+
             while True:
                 try:
-                    # 🎯 15 秒心跳保活机制：若上游在执行跨云/系统等复杂工具，每 15 秒发出一次 SSE 注释帧防止 Cloudflare 100s 断流
-                    chunk = await asyncio.wait_for(
-                        stream_iter.__anext__(), timeout=15.0
-                    )
+                    chunk = await asyncio.wait_for(queue.get(), timeout=15.0)
                 except TimeoutError:
                     yield ": keepalive-ping\n\n"
                     continue
-                except StopAsyncIteration:
+
+                if chunk is None:
                     break
+
+                if isinstance(chunk, Exception):
+                    raise chunk
 
                 delta = chunk.get("delta", "")
                 if delta:
@@ -190,6 +207,8 @@ async def chat_stream(
             }
             yield f"data: {json.dumps(err_payload)}\n\n"
         finally:
+            if "pump_task" in locals() and not pump_task.done():
+                pump_task.cancel()
             # 清理 Redis 中止标志
             with contextlib.suppress(Exception):
                 await redis_client.delete(stop_key)
