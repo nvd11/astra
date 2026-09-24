@@ -30,7 +30,8 @@ export const chatService = {
   async getModels(): Promise<ModelInfo[]> {
     try {
       const response = await axios.get<BaseResponse<ModelInfo[]>>(
-        `${API_BASE_URL}/chat/models`
+        `${API_BASE_URL}/chat/models`,
+        { withCredentials: true }
       );
       if (
         response.data &&
@@ -52,7 +53,8 @@ export const chatService = {
   async getAgents(): Promise<AgentInfo[]> {
     try {
       const response = await axios.get<BaseResponse<AgentInfo[]>>(
-        `${API_BASE_URL}/chat/agents`
+        `${API_BASE_URL}/chat/agents`,
+        { withCredentials: true }
       );
       if (
         response.data &&
@@ -90,7 +92,7 @@ export const chatService = {
     const response = await axios.post<BaseResponse<Conversation>>(
       `${API_BASE_URL}/conversations`,
       data,
-      { headers }
+      { headers, withCredentials: true }
     );
     return response.data.data;
   },
