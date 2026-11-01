@@ -342,6 +342,9 @@ def parse_model_metadata(model_id: str, default_model: str) -> dict[str, Any]:
     elif "glm" in mid:
         provider = "Zhipu AI"
         description = "智谱前沿旗舰认知与双语推理模型"
+    elif "yui" in mid:
+        provider = "Radxa Local"
+        description = "大和抚子系精灵结衣 · 本地私有边缘 Hermes 智能体"
     elif "rin" in mid:
         provider = "Radxa Local"
         description = "本地私有边缘 Hermes 智能体"
@@ -392,6 +395,14 @@ async def list_models(
         parsed_models = [
             parse_model_metadata(settings.default_model, settings.default_model)
         ]
+
+    # 🎀 动态装配本地边缘 Hermes 智能体 (Yui / Rin)
+    existing_ids = {m["id"] for m in parsed_models}
+    for hermes_agent in ("yui", "rin"):
+        if hermes_agent not in existing_ids:
+            parsed_models.append(
+                parse_model_metadata(hermes_agent, settings.default_model)
+            )
 
     # 3. 回填 Redis 缓存 (300 秒)
     try:

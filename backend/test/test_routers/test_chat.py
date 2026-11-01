@@ -336,7 +336,11 @@ class TestChatRouter:
             assert response.status_code == 200
             data = response.json()
             assert data["code"] == 0
-            assert len(data["data"]) == 3
+            # 包含网关的 3 个模型以及动态装配的 Hermes 本地智能体 (yui, rin)
+            assert len(data["data"]) == 5
+            model_ids = [m["id"] for m in data["data"]]
+            assert "yui" in model_ids
+            assert "rin" in model_ids
             assert data["data"][0]["provider"] == "Google"
             assert data["data"][1]["provider"] == "Moonshot"
             assert data["data"][2]["provider"] == "OpenAI"
