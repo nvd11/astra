@@ -141,9 +141,9 @@ class LiteLLMClient:
         formatted_model = self._normalize_model(model)
         logger.debug(f"LiteLLM astream_completion start: model={formatted_model}")
 
-        # 🎯 针对 Hermes Agent (rin / yui) 使用 LiteLLM 直通路由，完整接收自定义 SSE 事件
+        # 🎯 针对 Hermes Agent (rin / yui / hebe) 使用直通路由，完整接收自定义 SSE 事件
         normalized_lower = formatted_model.lower()
-        if normalized_lower in ("rin", "yui"):
+        if normalized_lower in ("rin", "yui", "hebe"):
             async for chunk in self._astream_hermes_passthrough(
                 messages=messages,
                 agent_name=normalized_lower,
@@ -210,7 +210,7 @@ class LiteLLMClient:
         import httpx
 
         # 优先使用 Tailscale IP 直连 Hermes Agent (避开 CoreDNS 对 ExternalName 解析失败的问题)
-        # yui: 8644 端口, rin: 8642 端口
+        # yui: 8644 端口 (Radxa), rin: 8642 端口 (Radxa), hebe: 8646 端口 (OCI ARM free-arm-vm)
         hermes_endpoints = {
             "yui": (
                 "http://100.115.214.26:8644/v1/chat/completions",
@@ -219,6 +219,10 @@ class LiteLLMClient:
             "rin": (
                 "http://100.115.214.26:8642/v1/chat/completions",
                 "sk-rin-8f1d3c92e104b47a952a123456789abc",
+            ),
+            "hebe": (
+                "http://100.105.130.0:8646/v1/chat/completions",
+                "sk-hebe-a536eb01f4c84b45def6f47e960fd314",
             ),
         }
 
