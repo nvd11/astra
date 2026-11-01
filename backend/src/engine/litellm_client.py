@@ -301,7 +301,7 @@ class LiteLLMClient:
             raise
 
     async def get_models(self) -> list[dict[str, Any]]:
-        """从 LiteLLM 网关动态拉取当前挂载的真实模型列表.
+        """从 AI 网关 (Higress / LiteLLM) 动态拉取当前挂载的真实模型列表.
 
         Returns:
             list[dict[str, Any]]: 模型元数据字典列表
@@ -311,17 +311,17 @@ class LiteLLMClient:
         url = f"{self.base_url}/models"
         headers = {"Authorization": f"Bearer {self.api_key}"}
 
-        logger.debug(f"Querying LiteLLM gateway models: {url}")
+        logger.debug(f"Querying AI gateway models: {url}")
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(url, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
                 raw_models: list[dict[str, Any]] = data.get("data", [])
-                logger.info(f"Discovered {len(raw_models)} models from LiteLLM gateway")
+                logger.info(f"Discovered {len(raw_models)} models from AI gateway")
                 return raw_models
         except Exception as err:
-            logger.error(f"Failed to fetch models from LiteLLM gateway: {err}")
+            logger.error(f"Failed to fetch models from AI gateway: {err}")
             return []
 
 

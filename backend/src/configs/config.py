@@ -133,14 +133,14 @@ class Settings(BaseSettings):
         default="redis://127.0.0.1:6379/0", description="Redis 连接串"
     )
 
-    # ========== 私有 LiteLLM 网关 ==========
+    # ========== LLM 推理网关配置 (Higress AI Gateway / LiteLLM Proxy) ==========
     litellm_base_url: str = Field(
-        default="https://litellm.jppwl.asia", description="LiteLLM 网关地址"
+        default="https://higress.jppwl.asia/v1", description="LLM 网关基础地址"
     )
     litellm_api_key: str = Field(
-        default="sk-placeholder-litellm-key", description="LiteLLM 网关密钥"
+        default="sk-cindy-higress-20261003-888888", description="LLM 网关访问密钥"
     )
-    default_model: str = Field(default="deepseek-v4-flash", description="默认 LLM 模型")
+    default_model: str = Field(default="deepseek-v4-pro-0813", description="默认 LLM 模型")
 
     # ========== JWT 认证与会话安全 ==========
     jwt_secret: str = Field(

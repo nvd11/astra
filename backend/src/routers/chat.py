@@ -312,58 +312,39 @@ async def stop_chat(
 
 
 def parse_model_metadata(model_id: str, default_model: str) -> dict[str, Any]:
-    """根据模型 ID 智能推断展示名称、提供商与特性描述."""
+    """保持网关原始模型 ID 作为展示名称，仅推断提供商标签与说明."""
     mid = model_id.lower()
     provider = "Custom"
     description = "通用大语言模型"
-    name = model_id
+    name = model_id  # 严格保持网关原始名称，不重命名！
 
     if "gemini" in mid:
         provider = "Google"
-        if "3.8" in mid:
-            name = "Gemini 3.8 Flash"
-            description = "主力旗舰模型，超低延迟与多模态强推理"
-        elif "3.7" in mid:
-            name = "Gemini 3.7 Flash"
-            description = "极速轻量模型，日常对话与敏捷代码生成"
-        else:
-            name = f"Gemini ({model_id})"
-            description = "Google 多模态大模型"
+        description = "Google 多模态大语言模型"
     elif "kimi" in mid:
         provider = "Moonshot"
-        name = "Kimi K3" if "k3" in mid else f"Kimi ({model_id})"
-        description = "超长文本与复杂中文语境深度理解分析"
+        description = "Moonshot 中文长文本大模型"
     elif "gpt" in mid or "luna" in mid:
         provider = "OpenAI"
-        if "yuanheng" in mid:
-            name = "GPT-5.6 Luna 元亨"
-            description = "深度思维链推导与复杂数学逻辑解析"
-        elif "a6" in mid:
-            name = "GPT-5.6 Luna A6"
-            description = "前沿高阶全能推理与系统架构设计"
-        else:
-            name = model_id
-            description = "OpenAI 兼容全能推理大模型"
+        description = "OpenAI 兼容全能推理模型"
     elif "deepseek" in mid:
         provider = "DeepSeek"
-        name = "DeepSeek V4 Flash" if "v4" in mid else model_id
-        description = "极速代码与深度推理"
+        description = "DeepSeek 深度代码与逻辑推理模型"
+    elif "hy3" in mid:
+        provider = "Tencent"
+        description = "腾讯混元多模态图文理解大模型"
     elif "claude" in mid:
         provider = "Anthropic"
-        name = "Claude Sonnet 4.6" if "4" in mid else model_id
-        description = "严谨逻辑分析与长文本架构"
+        description = "Anthropic 逻辑分析与长文本架构"
     elif "qwen" in mid:
         provider = "Alibaba"
-        name = "Qwen Max"
-        description = "通义千问旗舰中文模型"
+        description = "通义千问旗舰中文大模型"
     elif "glm" in mid:
         provider = "Zhipu AI"
-        name = "GLM-5.3" if "5.3" in mid else f"GLM ({model_id})"
         description = "智谱前沿旗舰认知与双语推理模型"
     elif "rin" in mid:
         provider = "Radxa Local"
-        name = "Rin (Hermes Agent)"
-        description = "傲娇大小姐凛 · 本地私有边缘 Hermes 智能体"
+        description = "本地私有边缘 Hermes 智能体"
 
     return {
         "id": model_id,

@@ -98,8 +98,8 @@ class TestConfig:
             == "mysql+asyncmy://astra_user:placeholder_pass@127.0.0.1:3306/astra"
         )
         assert settings.redis_url == "redis://127.0.0.1:6379/0"
-        assert settings.litellm_base_url == "https://litellm.jppwl.asia"
-        assert settings.default_model == "deepseek-v4-flash"
+        assert settings.litellm_base_url == "https://higress.jppwl.asia/v1"
+        assert settings.default_model == "deepseek-v4-pro-0813"
         assert settings.jwt_algorithm == "HS256"
         assert settings.jwt_access_token_expire_minutes == 120
         assert settings.jwt_refresh_token_expire_days == 7
