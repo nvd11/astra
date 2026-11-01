@@ -96,7 +96,7 @@ export const ModelSelector: React.FC = () => {
         <div className="absolute left-0 bottom-full mb-2 w-72 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between px-2.5 py-1">
             <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
-              底座推理模型 (LiteLLM 动态同步)
+              底座推理模型 (网关动态同步)
             </span>
             {isLoadingModels && (
               <Loader2 className="w-3 h-3 text-sky-500 animate-spin" />
