@@ -138,7 +138,7 @@ class Settings(BaseSettings):
         default="https://higress.jppwl.asia/v1", description="LLM 网关基础地址"
     )
     litellm_api_key: str = Field(
-        default="sk-cindy-higress-20261003-888888", description="LLM 网关访问密钥"
+        default="sk-astra-higress-20261101-888888", description="LLM 网关访问密钥"
     )
     default_model: str = Field(
         default="deepseek-v4-pro-0813", description="默认 LLM 模型"
