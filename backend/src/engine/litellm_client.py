@@ -209,15 +209,15 @@ class LiteLLMClient:
 
         import httpx
 
-        # 优先使用集群内 K8s Service 直连 Hermes Agent (零公网开销与超时保护)
+        # 优先使用 Tailscale IP 直连 Hermes Agent (避开 CoreDNS 对 ExternalName 解析失败的问题)
         # yui: 8644 端口, rin: 8642 端口
         hermes_endpoints = {
             "yui": (
-                "http://yui-api-svc.llm-system.svc.cluster.local:8644/v1/chat/completions",
+                "http://100.115.214.26:8644/v1/chat/completions",
                 "sk-yui-40b9abf5a3612e48aa25111afbc4f813",
             ),
             "rin": (
-                "http://rin-api-svc.llm-system.svc.cluster.local:8642/v1/chat/completions",
+                "http://100.115.214.26:8642/v1/chat/completions",
                 "sk-rin-8f1d3c92e104b47a952a123456789abc",
             ),
         }
