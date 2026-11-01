@@ -140,7 +140,9 @@ class Settings(BaseSettings):
     litellm_api_key: str = Field(
         default="sk-cindy-higress-20261003-888888", description="LLM 网关访问密钥"
     )
-    default_model: str = Field(default="deepseek-v4-pro-0813", description="默认 LLM 模型")
+    default_model: str = Field(
+        default="deepseek-v4-pro-0813", description="默认 LLM 模型"
+    )
 
     # ========== JWT 认证与会话安全 ==========
     jwt_secret: str = Field(
