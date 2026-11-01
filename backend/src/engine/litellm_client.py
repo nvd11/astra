@@ -209,14 +209,30 @@ class LiteLLMClient:
 
         import httpx
 
-        # 兼容带 /v1 或不带 /v1 的 base_url
-        base = self.base_url.rstrip("/")
-        if base.endswith("/v1"):
-            base = base[:-3]
+        # 优先使用集群内 K8s Service 直连 Hermes Agent (零公网开销与超时保护)
+        # yui: 8644 端口, rin: 8642 端口
+        hermes_endpoints = {
+            "yui": (
+                "http://yui-api-svc.llm-system.svc.cluster.local:8644/v1/chat/completions",
+                "sk-yui-40b9abf5a3612e48aa25111afbc4f813",
+            ),
+            "rin": (
+                "http://rin-api-svc.llm-system.svc.cluster.local:8642/v1/chat/completions",
+                "sk-rin-8f1d3c92e104b47a952a123456789abc",
+            ),
+        }
 
-        url = f"{base}/hermes/{agent_name}/v1/chat/completions"
+        if agent_name in hermes_endpoints:
+            url, auth_key = hermes_endpoints[agent_name]
+        else:
+            base = self.base_url.rstrip("/")
+            if base.endswith("/v1"):
+                base = base[:-3]
+            url = f"{base}/hermes/{agent_name}/v1/chat/completions"
+            auth_key = self.api_key
+
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {auth_key}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
