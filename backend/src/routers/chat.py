@@ -348,6 +348,9 @@ def parse_model_metadata(model_id: str, default_model: str) -> dict[str, Any]:
     elif "rin" in mid:
         provider = "Radxa Local"
         description = "本地私有边缘 Hermes 智能体"
+    elif "hebe" in mid:
+        provider = "OCI ARM"
+        description = "独立进化混血小师妹 · OCI 4C24G 算力 Hermes 智能体"
 
     return {
         "id": model_id,
@@ -396,9 +399,9 @@ async def list_models(
             parse_model_metadata(settings.default_model, settings.default_model)
         ]
 
-    # 🎀 动态装配本地边缘 Hermes 智能体 (Yui / Rin)
+    # 🎀 动态装配本地边缘 Hermes 智能体 (Yui / Rin / Hebe)
     existing_ids = {m["id"] for m in parsed_models}
-    for hermes_agent in ("yui", "rin"):
+    for hermes_agent in ("yui", "rin", "hebe"):
         if hermes_agent not in existing_ids:
             parsed_models.append(
                 parse_model_metadata(hermes_agent, settings.default_model)
