@@ -10,6 +10,7 @@
 
 import asyncio
 import json
+import os
 import uuid
 from collections.abc import AsyncIterator
 
@@ -22,13 +23,23 @@ import redis.asyncio as aioredis
 # 导入应用定义以满足覆盖率探针检测
 
 # 线上 API 入口与基础设施连接参数
-API_BASE_URL = "https://gw.jppwl.asia/astra/api"
-LIVE_MYSQL_HOST = "161.118.240.218"
-LIVE_MYSQL_PORT = 3306
-LIVE_MYSQL_USER = "admin"
-LIVE_MYSQL_PASS = "REDACTED"
-LIVE_MYSQL_DB = "astra"
-LIVE_REDIS_URL = "redis://:REDACTED@100.105.130.0:6379/0"
+# 凭据一律从环境变量读取, 禁止在源码中保存真实密码。
+# 手动运行 live 测试前:
+#   export LIVE_MYSQL_PASS='...'
+#   export LIVE_REDIS_URL='redis://:<password>@host:6379/0'
+API_BASE_URL = os.getenv("LIVE_API_BASE_URL", "https://gw.jppwl.asia/astra/api")
+LIVE_MYSQL_HOST = os.getenv("LIVE_MYSQL_HOST", "161.118.240.218")
+LIVE_MYSQL_PORT = int(os.getenv("LIVE_MYSQL_PORT", "3306"))
+LIVE_MYSQL_USER = os.getenv("LIVE_MYSQL_USER", "admin")
+LIVE_MYSQL_PASS = os.getenv("LIVE_MYSQL_PASS", "")
+LIVE_MYSQL_DB = os.getenv("LIVE_MYSQL_DB", "astra")
+LIVE_REDIS_URL = os.getenv("LIVE_REDIS_URL", "")
+
+# 缺少凭据时直接跳过, 避免用空密码反复尝试连接。
+pytestmark = pytest.mark.skipif(
+    not LIVE_MYSQL_PASS or not LIVE_REDIS_URL,
+    reason="需要 LIVE_MYSQL_PASS / LIVE_REDIS_URL 环境变量才能运行 live 测试",
+)
 
 
 @pytest_asyncio.fixture
